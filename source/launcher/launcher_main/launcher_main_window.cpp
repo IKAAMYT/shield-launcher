@@ -12,8 +12,8 @@
 namespace fs = std::filesystem;
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent),
-launcherDir(QCoreApplication::applicationDirPath().toStdWString()),  
-serverIpFile((fs::path(launcherDir) / L"servers.txt").wstring()),  
+launcherDir(QCoreApplication::applicationDirPath().toStdWString()),
+serverIpFile((fs::path(launcherDir) / L"servers.txt").wstring()),
 reshadeEnabled(false),
 volume(100),
 soundPath((fs::path(launcherDir) / L"sounds" / L"startup_sound.mp3").wstring()),
@@ -37,10 +37,8 @@ progressBar(nullptr)
     setWindowTitle("AlterCOD Launcher");
     setFixedSize(800, 600);
 
-
     HINSTANCE hInstance = GetModuleHandle(NULL);
     HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(101));
-
     if (hIcon) {
         SendMessage((HWND)winId(), WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
         SendMessage((HWND)winId(), WM_SETICON, ICON_BIG, (LPARAM)hIcon);
@@ -48,36 +46,22 @@ progressBar(nullptr)
     else {
         fs::path iconPath = fs::path(launcherDir) / "images" / "icon.ico";
         if (fs::exists(iconPath)) {
-            HICON fileIcon = (HICON)LoadImageW(
-                NULL,
-                std::wstring(iconPath.wstring()).c_str(),
-                IMAGE_ICON,
-                0, 0,
-                LR_LOADFROMFILE
-            );
-
+            HICON fileIcon = (HICON)LoadImageW(NULL, std::wstring(iconPath.wstring()).c_str(),
+                IMAGE_ICON, 0, 0, LR_LOADFROMFILE);
             if (fileIcon) {
                 SendMessage((HWND)winId(), WM_SETICON, ICON_SMALL, (LPARAM)fileIcon);
                 SendMessage((HWND)winId(), WM_SETICON, ICON_BIG, (LPARAM)fileIcon);
             }
-
             QIcon icon(QString::fromStdString(iconPath.string()));
-            if (!icon.isNull()) {
-                setWindowIcon(icon);
-                QApplication::setWindowIcon(icon);
-            }
+            if (!icon.isNull()) { setWindowIcon(icon); QApplication::setWindowIcon(icon); }
         }
     }
 
-    setAttribute(Qt::WA_TranslucentBackground);
-    setStyleSheet("background: transparent;");
-
-    //background label and set it as central widget
+    // ============ FOND ============
     QLabel* backgroundLabel = new QLabel(this);
     backgroundLabel->setFixedSize(800, 600);
     backgroundLabel->move(0, 0);
-
-    //background image relative to exe location
+    backgroundLabel->setStyleSheet("background-color: #08080a;");
     fs::path imagePath = fs::path(launcherDir) / "images" / "launcher.png";
     if (fs::exists(imagePath)) {
         QPixmap background(QString::fromStdString(imagePath.string()));
@@ -87,129 +71,205 @@ progressBar(nullptr)
             backgroundLabel->setAlignment(Qt::AlignCenter);
         }
     }
+    // voile sombre par-dessus le fond pour la lisibilité
+    QLabel* overlay = new QLabel(this);
+    overlay->setFixedSize(800, 600);
+    overlay->move(0, 0);
+    overlay->setStyleSheet("background-color: rgba(8, 8, 10, 180);");
 
     QWidget* container = new QWidget(this);
     container->setFixedSize(800, 600);
-    container->setAttribute(Qt::WA_TranslucentBackground);
     container->setStyleSheet("background: transparent;");
     setCentralWidget(container);
 
-    //mainlayout for all widgets
-    QVBoxLayout* mainLayout = new QVBoxLayout(container);
+    // styles réutilisables
+    const QString sideBtn =
+        "QPushButton { background: transparent; color: #8a8a82; border: none;"
+        " border-left: 3px solid transparent; text-align: left; padding: 12px 18px;"
+        " font-size: 15px; font-weight: bold; letter-spacing: 1px; }"
+        "QPushButton:hover { color: #f2c411; border-left: 3px solid #f2c411;"
+        " background: rgba(242,196,17,0.08); }";
 
-    QHBoxLayout* topRowLayout = new QHBoxLayout();
+    const QString goldBtn =
+        "QPushButton { background: rgba(10,10,8,200); color: #f2c411;"
+        " border: 1px solid #f2c411; border-radius: 5px; padding: 8px 14px;"
+        " font-size: 13px; font-weight: bold; letter-spacing: 1px; }"
+        "QPushButton:hover { background: #f2c411; color: #08080a; }";
 
-    //username and IP buttons
-    nameButton = new QPushButton("Change Name", this);
-    nameButton->setStyleSheet("background-color: rgba(10, 10, 8, 200); color: #f2c411; border: 1px solid #f2c411; border-radius: 4px; padding: 5px; font-weight: bold;");
-    topRowLayout->addWidget(nameButton);
+    // ============ LAYOUT GLOBAL : sidebar | contenu ============
+    QHBoxLayout* rootLayout = new QHBoxLayout(container);
+    rootLayout->setContentsMargins(0, 0, 0, 0);
+    rootLayout->setSpacing(0);
 
-    ipButton = new QPushButton("Change IP Address", this);
-    ipButton->setStyleSheet("background-color: rgba(10, 10, 8, 200); color: #f2c411; border: 1px solid #f2c411; border-radius: 4px; padding: 5px; font-weight: bold;");
-    topRowLayout->addWidget(ipButton);
+    // ----- SIDEBAR GAUCHE -----
+    QWidget* sidebar = new QWidget(this);
+    sidebar->setFixedWidth(180);
+    sidebar->setStyleSheet("background-color: rgba(6,6,8,235); border-right: 1px solid rgba(242,196,17,0.30);");
+    QVBoxLayout* sideLayout = new QVBoxLayout(sidebar);
+    sideLayout->setContentsMargins(0, 22, 0, 18);
+    sideLayout->setSpacing(2);
 
-    //spacer to push Docs button to the right
-    QSpacerItem* spacer = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
-    topRowLayout->addItem(spacer);
+    // logo + titre en haut de la sidebar
+    QLabel* brand = new QLabel("ALTERCOD", this);
+    brand->setStyleSheet("color: #f2c411; font-size: 20px; font-weight: bold; letter-spacing: 3px; padding: 0 0 18px 18px; background: transparent;");
+    sideLayout->addWidget(brand);
 
-    //docs
-    wikiButton = new QPushButton("AlterCOD Docs", this);
-    wikiButton->setStyleSheet("background-color: rgba(10, 10, 8, 200); color: #f2c411; border: 1px solid #f2c411; border-radius: 4px; padding: 5px; font-weight: bold;");
-    topRowLayout->addWidget(wikiButton);
+    // bouton JOUER (scroll vers le bas n'a pas de sens ici : il déclenche online aussi possible,
+    // mais on le laisse décoratif d'ancrage. Les vrais lancements sont en bas à droite.)
+    QPushButton* navPlay = new QPushButton("  JOUER", this);
+    navPlay->setStyleSheet(
+        "QPushButton { background: rgba(242,196,17,0.10); color: #f2c411; border: none;"
+        " border-left: 3px solid #f2c411; text-align: left; padding: 12px 18px;"
+        " font-size: 15px; font-weight: bold; letter-spacing: 1px; }");
+    sideLayout->addWidget(navPlay);
 
-    discordButton = new QPushButton("Discord", this);
-    discordButton->setStyleSheet("background-color: rgba(10, 10, 8, 200); color: #f2c411; border: 1px solid #f2c411; border-radius: 4px; padding: 5px; font-weight: bold;");
-    topRowLayout->addWidget(discordButton);
+    // PROFIL -> ouvre le changement de pseudo (réutilise setName)
+    nameButton = new QPushButton("  PROFIL", this);
+    nameButton->setStyleSheet(sideBtn);
+    sideLayout->addWidget(nameButton);
 
-    mainLayout->addLayout(topRowLayout);
+    // SERVEUR -> ouvre le changement d'IP (réutilise setIp)
+    ipButton = new QPushButton("  SERVEUR", this);
+    ipButton->setStyleSheet(sideBtn);
+    sideLayout->addWidget(ipButton);
 
-    mainLayout->addSpacerItem(new QSpacerItem(20, 40, QSizePolicy::Minimum, QSizePolicy::Expanding));
+    // REGLAGES -> ouvre les settings client (réutilise openSettings)
+    settingsButton = new QPushButton("  REGLAGES", this);
+    settingsButton->setStyleSheet(sideBtn);
+    sideLayout->addWidget(settingsButton);
 
-    // version display
-    QLabel* versionLabel = new QLabel(QString("Version: v%1").arg(QString::fromStdString(updater::get_server_version())), this);
-    versionLabel->setStyleSheet("color: white; background: transparent; font-weight: bold;");
-    mainLayout->addWidget(versionLabel);
+    sideLayout->addStretch();
 
-    //settings layout
-    QHBoxLayout* settingsLayout = new QHBoxLayout();
+    // liens bas de sidebar : Discord + Docs
+    discordButton = new QPushButton("  DISCORD", this);
+    discordButton->setStyleSheet(sideBtn);
+    sideLayout->addWidget(discordButton);
 
-    //volume slider
+    wikiButton = new QPushButton("  SITE / DOCS", this);
+    wikiButton->setStyleSheet(sideBtn);
+    sideLayout->addWidget(wikiButton);
+
+    rootLayout->addWidget(sidebar);
+
+    // ----- ZONE CONTENU DROITE -----
+    QWidget* content = new QWidget(this);
+    content->setStyleSheet("background: transparent;");
+    QVBoxLayout* contentLayout = new QVBoxLayout(content);
+    contentLayout->setContentsMargins(30, 26, 30, 24);
+    contentLayout->setSpacing(0);
+
+    // statut serveur (statique, indicateur visuel)
+    QLabel* statusLabel = new QLabel("\u25CF  CLIENT PRET", this);
+    statusLabel->setStyleSheet("color: #39d98a; font-size: 12px; font-weight: bold; letter-spacing: 2px; background: transparent;");
+    contentLayout->addWidget(statusLabel);
+
+    contentLayout->addSpacing(10);
+
+    QLabel* subTitle = new QLabel("BLACK OPS 4 \u00B7 CLIENT", this);
+    subTitle->setStyleSheet("color: #c8c6ba; font-size: 13px; font-weight: bold; letter-spacing: 3px; background: transparent;");
+    contentLayout->addWidget(subTitle);
+
+    QLabel* bigTitle = new QLabel("ALTERCOD", this);
+    bigTitle->setStyleSheet("color: #f2c411; font-size: 52px; font-weight: bold; letter-spacing: 4px; background: transparent;");
+    contentLayout->addWidget(bigTitle);
+
+    contentLayout->addSpacing(14);
+
+    // badges (version + à jour)
+    QHBoxLayout* badgeRow = new QHBoxLayout();
+    badgeRow->setSpacing(8);
+    QLabel* verBadge = new QLabel(QString("v%1").arg(QString::fromStdString(updater::get_server_version())), this);
+    verBadge->setStyleSheet("color: #f2c411; border: 1px solid rgba(242,196,17,0.5); border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: bold; letter-spacing: 1px; background: transparent;");
+    badgeRow->addWidget(verBadge);
+    QLabel* upToDate = new QLabel("\u00C0 JOUR", this);
+    upToDate->setStyleSheet("color: #39d98a; border: 1px solid rgba(57,217,138,0.5); border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: bold; letter-spacing: 1px; background: transparent;");
+    badgeRow->addWidget(upToDate);
+    badgeRow->addStretch();
+    contentLayout->addLayout(badgeRow);
+
+    contentLayout->addStretch();
+
+    // volume
+    QHBoxLayout* volRow = new QHBoxLayout();
+    volumeLabel = new QLabel("VOLUME", this);
+    volumeLabel->setStyleSheet("color: #8a8a82; font-size: 11px; font-weight: bold; letter-spacing: 2px; background: transparent;");
+    volRow->addWidget(volumeLabel);
     volumeSlider = new QSlider(Qt::Horizontal, this);
     volumeSlider->setRange(0, 100);
     volumeSlider->setValue(volume);
-    volumeSlider->setFixedWidth(120);
     volumeSlider->setStyleSheet(
-        "QSlider::groove:horizontal {"
-        "  height: 6px;"
-        "  background: rgba(40, 40, 40, 180);"
-        "  border-radius: 3px;"
-        "}"
-        "QSlider::handle:horizontal {"
-        "  background: rgba(10, 10, 8, 200);"
-        "  border: 1px solid #ffffff;"
-        "  width: 14px;"
-        "  margin-top: -4px;"
-        "  margin-bottom: -4px;"
-        "  border-radius: 7px;"
-        "}"
-        "QSlider::sub-page:horizontal {"
-        "  background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, stop: 0 #d9af0e, stop: 1 #f2c411);"
-        "  border-radius: 3px;"
-        "}"
-    );
-    settingsLayout->addWidget(volumeSlider);
+        "QSlider::groove:horizontal { height: 6px; background: rgba(242,196,17,0.12);"
+        " border: 1px solid rgba(242,196,17,0.4); border-radius: 3px; }"
+        "QSlider::handle:horizontal { background: #f2c411; border: 1px solid #ffd633;"
+        " width: 16px; margin-top: -6px; margin-bottom: -6px; border-radius: 8px; }"
+        "QSlider::sub-page:horizontal { background: #f2c411; border-radius: 3px; }");
+    volRow->addWidget(volumeSlider, 1);
+    contentLayout->addLayout(volRow);
 
-    volumeLabel = new QLabel("Volume:", this);
-    volumeLabel->setStyleSheet("color: white; background: transparent; font-weight: bold;");
-    settingsLayout->addWidget(volumeLabel);
+    contentLayout->addSpacing(8);
 
-    //spacer to push settings button to the right
-    QSpacerItem* settingsSpacer = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
-    settingsLayout->addItem(settingsSpacer);
+    // case "fermer au lancement"
+    closeLauncherCheckbox = new QCheckBox("Fermer le launcher au lancement", this);
+    closeLauncherCheckbox->setStyleSheet(
+        "QCheckBox { color: #c8c6ba; font-size: 12px; font-weight: bold; background: transparent; }"
+        "QCheckBox::indicator { width: 15px; height: 15px; }"
+        "QCheckBox::indicator:unchecked { border: 1px solid #f2c411; background: rgba(10,10,8,200); border-radius: 3px; }"
+        "QCheckBox::indicator:checked { border: 1px solid #ffd633; background: #f2c411; border-radius: 3px; }");
+    contentLayout->addWidget(closeLauncherCheckbox);
 
-	//close launcher on play checkbox
-    closeLauncherCheckbox = new QCheckBox("Close Launcher on Play", this);
-    closeLauncherCheckbox->setStyleSheet("color: white; background: transparent; font-weight: bold;");
-    settingsLayout->addWidget(closeLauncherCheckbox);
+    contentLayout->addSpacing(14);
 
-    //settings button 
-    settingsButton = new QPushButton("Client Settings", this);
-    settingsButton->setStyleSheet("background-color: rgba(10, 10, 8, 200); color: #f2c411; border: 1px solid #f2c411; border-radius: 4px; padding: 5px; min-width: 80px; font-weight: bold;");
-    settingsButton->setFixedWidth(120);
-    settingsLayout->addWidget(settingsButton);
-
-    mainLayout->addLayout(settingsLayout);
-
-    //button layout
-    QHBoxLayout* buttonLayout = new QHBoxLayout();
-
-    //game mode buttons
-    vanillaButton = new QPushButton("Vanilla", this);
-    vanillaButton->setStyleSheet("background-color: rgba(10, 10, 8, 200); color: #f2c411; border: 1px solid #f2c411; border-radius: 4px; padding: 5px; font-weight: bold;");
-    buttonLayout->addWidget(vanillaButton);
-
-    offlineButton = new QPushButton("Offline", this);
-    offlineButton->setStyleSheet("background-color: rgba(10, 10, 8, 200); color: #f2c411; border: 1px solid #f2c411; border-radius: 4px; padding: 5px; font-weight: bold;");
-    buttonLayout->addWidget(offlineButton);
-
-    onlineButton = new QPushButton("Online", this);
-    onlineButton->setStyleSheet("background-color: rgba(10, 10, 8, 200); color: #f2c411; border: 1px solid #f2c411; border-radius: 4px; padding: 5px; font-weight: bold;");
-    buttonLayout->addWidget(onlineButton);
-
-    mainLayout->addLayout(buttonLayout);
-
-    //progress bar
+    // barre de progression
     progressBar = new QProgressBar(this);
-    progressBar->setStyleSheet("QProgressBar { border: 1px solid #f2c411; border-radius: 4px; text-align: center; background: rgba(10,10,8,160); } QProgressBar::chunk { background-color: #f2c411; border-radius: 3px; }");
+    progressBar->setStyleSheet(
+        "QProgressBar { border: 1px solid #f2c411; border-radius: 4px; text-align: center;"
+        " color: #f5f3ea; background: rgba(10,10,8,160); font-weight: bold; }"
+        "QProgressBar::chunk { background-color: #f2c411; border-radius: 3px; }");
     progressBar->setVisible(false);
-    mainLayout->addWidget(progressBar);
+    contentLayout->addWidget(progressBar);
 
+    contentLayout->addSpacing(6);
+
+    // ----- BOUTONS DE LANCEMENT -----
+    QHBoxLayout* launchRow = new QHBoxLayout();
+    launchRow->setSpacing(10);
+
+    onlineButton = new QPushButton("\u25B6  ONLINE", this);
+    onlineButton->setStyleSheet(
+        "QPushButton { background: #f2c411; color: #08080a; border: none; border-radius: 5px;"
+        " padding: 15px; font-size: 17px; font-weight: bold; letter-spacing: 3px; }"
+        "QPushButton:hover { background: #ffd633; }"
+        "QPushButton:disabled { background: rgba(242,196,17,0.3); color: rgba(8,8,10,0.5); }");
+    launchRow->addWidget(onlineButton, 2);
+
+    offlineButton = new QPushButton("OFFLINE", this);
+    offlineButton->setStyleSheet(
+        "QPushButton { background: rgba(10,10,8,200); color: #f2c411; border: 1px solid #f2c411;"
+        " border-radius: 5px; padding: 15px; font-size: 14px; font-weight: bold; letter-spacing: 2px; }"
+        "QPushButton:hover { background: #f2c411; color: #08080a; }"
+        "QPushButton:disabled { color: rgba(242,196,17,0.4); border-color: rgba(242,196,17,0.4); }");
+    launchRow->addWidget(offlineButton, 1);
+
+    vanillaButton = new QPushButton("VANILLA", this);
+    vanillaButton->setStyleSheet(
+        "QPushButton { background: rgba(10,10,8,200); color: #8a8a82; border: 1px solid rgba(242,196,17,0.3);"
+        " border-radius: 5px; padding: 15px; font-size: 14px; font-weight: bold; letter-spacing: 2px; }"
+        "QPushButton:hover { background: rgba(242,196,17,0.15); color: #f2c411; }"
+        "QPushButton:disabled { color: rgba(138,138,130,0.4); }");
+    launchRow->addWidget(vanillaButton, 1);
+
+    contentLayout->addLayout(launchRow);
+
+    rootLayout->addWidget(content, 1);
+
+    // mise à jour + son au démarrage (inchangé)
     QTimer::singleShot(500, this, [this]() {
         updater::check_and_prompt_for_updates(this);
         QTimer::singleShot(1000, this, &MainWindow::playStartupSound);
         });
 
-    //signals
+    // ============ CONNEXIONS (mécanique inchangée) ============
+    connect(navPlay, &QPushButton::clicked, this, [this]() { startGame(true); });
     connect(vanillaButton, &QPushButton::clicked, this, [this]() { startGame(false, true); });
     connect(onlineButton, &QPushButton::clicked, this, [this]() { startGame(true); });
     connect(offlineButton, &QPushButton::clicked, this, [this]() { startGame(false); });
@@ -223,16 +283,12 @@ progressBar(nullptr)
         closeLauncherOnPlay = (state == Qt::Checked);
         saveCloseLauncheronPlay();
         });
-    connect(reshadeCheckbox, &QCheckBox::stateChanged, this, [this](int state) {
-        reshadeEnabled = (state == Qt::Checked);
-        });
 
-    setAttribute(Qt::WA_TranslucentBackground);
-
-    // Load settings from JSON, after creating everything.
+    // Charge les réglages sauvegardés
     loadVolumeSettings();
     loadCloseLauncheronPlay();
 }
+
 
 void MainWindow::startGame(bool isOnline, bool isVanilla) {
 
