@@ -1,0 +1,71 @@
+name: Build AlterCOD Launcher
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:   # permet de lancer le build à la main depuis l'onglet Actions
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Installer Qt6 (MSVC 2022 64-bit)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.7.2'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2022_64'
+          modules: 'qtnetworkauth'
+          cache: true
+
+      - name: Copier Qt6 dans deps/qt6 (structure attendue par premake)
+        shell: pwsh
+        run: |
+          # install-qt-action expose Qt via la variable QT_ROOT_DIR
+          $qt = "$env:QT_ROOT_DIR"
+          Write-Host "Qt root: $qt"
+          New-Item -ItemType Directory -Force -Path deps/qt6 | Out-Null
+          Copy-Item "$qt/include" deps/qt6/include -Recurse -Force
+          Copy-Item "$qt/lib"     deps/qt6/lib     -Recurse -Force
+          Copy-Item "$qt/bin"     deps/qt6/bin     -Recurse -Force
+          Write-Host "Qt copié dans deps/qt6"
+
+      - name: Ajouter MSBuild au PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Générer le projet Visual Studio (premake5)
+        shell: cmd
+        run: tools\premake5.exe vs2022
+
+      - name: Compiler en Release x64
+        shell: cmd
+        run: msbuild build\Shield_launcher.sln /p:Configuration=Release /p:Platform=x64 /m
+
+      - name: Récupérer l'exe et les DLL
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifact | Out-Null
+          # cherche l'exe produit (le nom peut varier selon premake)
+          $exe = Get-ChildItem -Recurse -Path build -Filter *.exe |
+                 Where-Object { $_.FullName -match 'Release' } | Select-Object -First 1
+          if ($exe) {
+            Copy-Item $exe.FullName artifact/
+            Write-Host "EXE trouvé : $($exe.FullName)"
+            # copie les DLL Qt à côté
+            Copy-Item deps/qt6/bin/*.dll artifact/ -Force -ErrorAction SilentlyContinue
+          } else {
+            Write-Error "Aucun .exe trouvé dans build/ — vérifie les logs de compilation."
+          }
+
+      - name: Publier l'artefact téléchargeable
+        uses: actions/upload-artifact@v4
+        with:
+          name: AlterCOD-Launcher
+          path: artifact/

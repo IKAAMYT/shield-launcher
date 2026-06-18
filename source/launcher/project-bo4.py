@@ -39,7 +39,7 @@ from PyQt5.QtCore import Qt, QUrl, QSize
 GITHUB_REPO = "bodnjenie14/Project_-bo4_Launcher"
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Project BO4 Launcher")
+    parser = argparse.ArgumentParser(description="AlterCOD Launcher")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--offline", "--solo", action="store_true", help="Start the game offline (solo mode)")
     group.add_argument("--online", "--multiplayer", action="store_true", help="Start the game offline (solo mode)")
@@ -131,8 +131,8 @@ def missing_dll_exit():
     error_message.setStyleSheet("QLabel{ color: black}")
     error_message.setIcon(QMessageBox.Critical)
     error_message.setWindowIcon(QIcon(os.path.join(resources_dir, 'images', 'exe_icon_bo4.ico')))
-    error_message.setText("Missing Project BO4 DLL".ljust(75))  # Questionable fix for width
-    error_message.setInformativeText("Couldn't find required DLL files, you may need to adjust your antivirus settings.\n\nPlease read the Shield Documentation.\n")
+    error_message.setText("Missing AlterCOD DLL".ljust(75))  # Questionable fix for width
+    error_message.setInformativeText("Couldn't find required DLL files, you may need to adjust your antivirus settings.\n\nPlease read the AlterCOD Documentation.\n")
     error_message.setStandardButtons(QMessageBox.Help | QMessageBox.Ok)
     error_message.setDefaultButton(QMessageBox.Help)
     if error_message.exec_() == 16777216:
@@ -350,7 +350,7 @@ class launcher(QWidget):
 
     def initUI(self):
         layout = QVBoxLayout()
-        self.setWindowTitle('Project-BO4')
+        self.setWindowTitle('AlterCOD Launcher')
         self.setWindowIcon(QIcon(os.path.join(resources_dir, 'images', 'exe_icon_bo4.ico')))
 
         top_row_layout = QHBoxLayout()
@@ -854,7 +854,7 @@ class updater(QWidget):
 
     def initUI(self):
         layout = QVBoxLayout()
-        self.setWindowTitle('Project-bo4 updater')
+        self.setWindowTitle('AlterCOD updater')
         self.setWindowIcon(QIcon(os.path.join(resources_dir, 'images', 'exe_icon_bo4.ico')))
 
         background_label = QLabel(self)

@@ -34,7 +34,7 @@ progressBar(nullptr)
     fs::create_directories(launcherDir);
     fs::create_directories(fs::path(launcherDir) / "sounds");
 
-    setWindowTitle("Project-BO4");
+    setWindowTitle("AlterCOD Launcher");
     setFixedSize(800, 600);
 
 
@@ -101,11 +101,11 @@ progressBar(nullptr)
 
     //username and IP buttons
     nameButton = new QPushButton("Change Name", this);
-    nameButton->setStyleSheet("background-color: rgba(85, 85, 85, 180); color: white; border: none; padding: 5px;");
+    nameButton->setStyleSheet("background-color: rgba(10, 10, 8, 200); color: #f2c411; border: 1px solid #f2c411; border-radius: 4px; padding: 5px; font-weight: bold;");
     topRowLayout->addWidget(nameButton);
 
     ipButton = new QPushButton("Change IP Address", this);
-    ipButton->setStyleSheet("background-color: rgba(85, 85, 85, 180); color: white; border: none; padding: 5px;");
+    ipButton->setStyleSheet("background-color: rgba(10, 10, 8, 200); color: #f2c411; border: 1px solid #f2c411; border-radius: 4px; padding: 5px; font-weight: bold;");
     topRowLayout->addWidget(ipButton);
 
     //spacer to push Docs button to the right
@@ -113,12 +113,12 @@ progressBar(nullptr)
     topRowLayout->addItem(spacer);
 
     //docs
-    wikiButton = new QPushButton("Shield Docs", this);
-    wikiButton->setStyleSheet("background-color: rgba(85, 85, 85, 180); color: white; border: none; padding: 5px;");
+    wikiButton = new QPushButton("AlterCOD Docs", this);
+    wikiButton->setStyleSheet("background-color: rgba(10, 10, 8, 200); color: #f2c411; border: 1px solid #f2c411; border-radius: 4px; padding: 5px; font-weight: bold;");
     topRowLayout->addWidget(wikiButton);
 
     discordButton = new QPushButton("Discord", this);
-    discordButton->setStyleSheet("background-color: rgba(85, 85, 85, 180); color: white; border: none; padding: 5px;");
+    discordButton->setStyleSheet("background-color: rgba(10, 10, 8, 200); color: #f2c411; border: 1px solid #f2c411; border-radius: 4px; padding: 5px; font-weight: bold;");
     topRowLayout->addWidget(discordButton);
 
     mainLayout->addLayout(topRowLayout);
@@ -145,7 +145,7 @@ progressBar(nullptr)
         "  border-radius: 3px;"
         "}"
         "QSlider::handle:horizontal {"
-        "  background: #1a3c5e;"
+        "  background: rgba(10, 10, 8, 200);"
         "  border: 1px solid #ffffff;"
         "  width: 14px;"
         "  margin-top: -4px;"
@@ -153,7 +153,7 @@ progressBar(nullptr)
         "  border-radius: 7px;"
         "}"
         "QSlider::sub-page:horizontal {"
-        "  background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, stop: 0 #1a3c5e, stop: 1 #2a5c8e);"
+        "  background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, stop: 0 #d9af0e, stop: 1 #f2c411);"
         "  border-radius: 3px;"
         "}"
     );
@@ -174,7 +174,7 @@ progressBar(nullptr)
 
     //settings button 
     settingsButton = new QPushButton("Client Settings", this);
-    settingsButton->setStyleSheet("background-color: rgba(85, 85, 85, 180); color: white; border: none; padding: 5px; min-width: 80px;");
+    settingsButton->setStyleSheet("background-color: rgba(10, 10, 8, 200); color: #f2c411; border: 1px solid #f2c411; border-radius: 4px; padding: 5px; min-width: 80px; font-weight: bold;");
     settingsButton->setFixedWidth(120);
     settingsLayout->addWidget(settingsButton);
 
@@ -185,22 +185,22 @@ progressBar(nullptr)
 
     //game mode buttons
     vanillaButton = new QPushButton("Vanilla", this);
-    vanillaButton->setStyleSheet("background-color: rgba(85, 85, 85, 180); color: white; border: none; padding: 5px;");
+    vanillaButton->setStyleSheet("background-color: rgba(10, 10, 8, 200); color: #f2c411; border: 1px solid #f2c411; border-radius: 4px; padding: 5px; font-weight: bold;");
     buttonLayout->addWidget(vanillaButton);
 
     offlineButton = new QPushButton("Offline", this);
-    offlineButton->setStyleSheet("background-color: rgba(85, 85, 85, 180); color: white; border: none; padding: 5px;");
+    offlineButton->setStyleSheet("background-color: rgba(10, 10, 8, 200); color: #f2c411; border: 1px solid #f2c411; border-radius: 4px; padding: 5px; font-weight: bold;");
     buttonLayout->addWidget(offlineButton);
 
     onlineButton = new QPushButton("Online", this);
-    onlineButton->setStyleSheet("background-color: rgba(85, 85, 85, 180); color: white; border: none; padding: 5px;");
+    onlineButton->setStyleSheet("background-color: rgba(10, 10, 8, 200); color: #f2c411; border: 1px solid #f2c411; border-radius: 4px; padding: 5px; font-weight: bold;");
     buttonLayout->addWidget(onlineButton);
 
     mainLayout->addLayout(buttonLayout);
 
     //progress bar
     progressBar = new QProgressBar(this);
-    progressBar->setStyleSheet("QProgressBar { border: 1px solid rgba(68, 68, 68, 180); text-align: center; background: transparent; } QProgressBar::chunk { background-color: rgba(85, 85, 85, 180); }");
+    progressBar->setStyleSheet("QProgressBar { border: 1px solid #f2c411; border-radius: 4px; text-align: center; background: rgba(10,10,8,160); } QProgressBar::chunk { background-color: #f2c411; border-radius: 3px; }");
     progressBar->setVisible(false);
     mainLayout->addWidget(progressBar);
 

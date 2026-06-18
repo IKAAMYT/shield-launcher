@@ -21,20 +21,20 @@ public:
             QComboBox* comboBox = new QComboBox(parent);
             comboBox->addItem("false", false);
             comboBox->addItem("true", true);
-            comboBox->setStyleSheet("QComboBox { background-color: #151515; color: white; border: 1px solid #333333; padding: 5px; }");
+            comboBox->setStyleSheet("QComboBox { background-color: #0a0a08; color: white; border: 1px solid #f2c411; padding: 5px; }");
             return comboBox;
         } else if (type == "int") {
             QSpinBox* spinBox = new QSpinBox(parent);
             spinBox->setRange(-99999, 99999);
-            spinBox->setStyleSheet("QSpinBox { background-color: #151515; color: white; border: 1px solid #333333; padding: 5px; selection-background-color: #1a3c5e; }");
+            spinBox->setStyleSheet("QSpinBox { background-color: #0a0a08; color: white; border: 1px solid #f2c411; padding: 5px; selection-background-color: #f2c411; }");
             return spinBox;
         } else if (type == "int64") {
             QLineEdit* lineEdit = new QLineEdit(parent);
-            lineEdit->setStyleSheet("QLineEdit { background-color: #151515; color: white; border: 1px solid #333333; padding: 5px; selection-background-color: #1a3c5e; }");
+            lineEdit->setStyleSheet("QLineEdit { background-color: #0a0a08; color: white; border: 1px solid #f2c411; padding: 5px; selection-background-color: #f2c411; }");
             return lineEdit;
         } else if (type == "string") {
             QLineEdit* lineEdit = new QLineEdit(parent);
-            lineEdit->setStyleSheet("QLineEdit { background-color: #151515; color: white; border: 1px solid #333333; padding: 5px; selection-background-color: #1a3c5e; }");
+            lineEdit->setStyleSheet("QLineEdit { background-color: #0a0a08; color: white; border: 1px solid #f2c411; padding: 5px; selection-background-color: #f2c411; }");
             return lineEdit;
         }
         */
@@ -222,23 +222,23 @@ void SettingsDialog::createLayout() {
         "   background-color: #0a0a0a;"
         "   alternate-background-color: #101010;"
         "   color: white;"
-        "   border: 1px solid #333333;"
+        "   border: 1px solid #f2c411;"
         "}"
         "QTreeWidget::item {"
         "   padding: 5px;"
         "   border-bottom: 1px solid #222222;"
         "}"
         "QTreeWidget::item:selected {"
-        "   background-color: #1a3c5e;"  
+        "   background-color: #f2c411;"  
         "}"
         "QTreeWidget::branch {"
         "   background-color: transparent;"
         "}"
         "QHeaderView::section {"
-        "   background-color: #151515;"
+        "   background-color: #0a0a08;"
         "   color: #cccccc;"
         "   padding: 5px;"
-        "   border: 1px solid #333333;"
+        "   border: 1px solid #f2c411;"
         "}"
     );
     
@@ -259,17 +259,21 @@ void SettingsDialog::createLayout() {
     
     QString buttonStyle = 
         "QPushButton {"
-        "   background-color: #1a3c5e;"  
-        "   color: white;"
-        "   border: none;"
+        "   background-color: rgba(10, 10, 8, 220);"  
+        "   color: #f2c411;"
+        "   border: 1px solid #f2c411;"
+        "   border-radius: 4px;"
+        "   font-weight: bold;"
         "   padding: 8px 16px;"
         "   min-width: 100px;"
         "}"
         "QPushButton:hover {"
-        "   background-color: #2a5c8e;"  
+        "   background-color: #f2c411;"
+        "   color: #0a0a08;"
         "}"
         "QPushButton:pressed {"
-        "   background-color: #0a2c4e;"  
+        "   background-color: #d9af0e;"
+        "   color: #0a0a08;"
         "}";
     
     saveButton->setStyleSheet(buttonStyle);
@@ -293,18 +297,18 @@ void SettingsDialog::createLayout() {
         "   color: white;"
         "}"
         "QLineEdit {"
-        "   background-color: #151515;"
+        "   background-color: #0a0a08;"
         "   color: white;"
-        "   border: 1px solid #333333;"
+        "   border: 1px solid #f2c411;"
         "   padding: 5px;"
-        "   selection-background-color: #1a3c5e;"  
+        "   selection-background-color: #f2c411;"  
         "}"
         "QSpinBox {"
-        "   background-color: #151515;"
+        "   background-color: #0a0a08;"
         "   color: white;"
-        "   border: 1px solid #333333;"
+        "   border: 1px solid #f2c411;"
         "   padding: 5px;"
-        "   selection-background-color: #1a3c5e;"  
+        "   selection-background-color: #f2c411;"  
         "}"
         "QCheckBox {"
         "   color: white;"
@@ -314,12 +318,12 @@ void SettingsDialog::createLayout() {
         "   height: 16px;"
         "}"
         "QCheckBox::indicator:unchecked {"
-        "   background-color: #151515;"
-        "   border: 1px solid #333333;"
+        "   background-color: #0a0a08;"
+        "   border: 1px solid #f2c411;"
         "}"
         "QCheckBox::indicator:checked {"
-        "   background-color: #1a3c5e;"  
-        "   border: 1px solid #333333;"
+        "   background-color: #f2c411;"  
+        "   border: 1px solid #f2c411;"
         "}"
     );
 }
