@@ -469,12 +469,12 @@ void MainWindow::setIp() {
 
 void MainWindow::openDiscord() {
 
-    QDesktopServices::openUrl(QUrl("https://discord.gg/AXECAzJJGU"));
+    QDesktopServices::openUrl(QUrl("https://discord.gg/v9v5DHPYBR"));
 }
 
 void MainWindow::openDocs() {
 
-    QDesktopServices::openUrl(QUrl("https://shield-bo4.gitbook.io/"));
+    QDesktopServices::openUrl(QUrl("https://leikaam.fr/AlterCOD"));
 }
 
 void MainWindow::updateVolume(int value) {
