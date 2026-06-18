@@ -3,7 +3,7 @@ name: Build AlterCOD Launcher
 on:
   push:
     branches: [ main, master ]
-  workflow_dispatch:   # permet de lancer le build à la main depuis l'onglet Actions
+  workflow_dispatch:
 
 jobs:
   build:
@@ -15,32 +15,41 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Installer Qt6 (MSVC 2022 64-bit)
-        uses: jurplel/install-qt-action@v4
+      - name: Installer Python
+        uses: actions/setup-python@v5
         with:
-          version: '6.7.2'
-          host: 'windows'
-          target: 'desktop'
-          arch: 'win64_msvc2022_64'
-          modules: 'qtnetworkauth'
-          cache: true
+          python-version: '3.11'
 
-      - name: Copier Qt6 dans deps/qt6 (structure attendue par premake)
+      - name: Installer Qt6 via aqt (methode robuste)
         shell: pwsh
         run: |
-          # install-qt-action expose Qt via la variable QT_ROOT_DIR
-          $qt = "$env:QT_ROOT_DIR"
+          python -m pip install --upgrade pip
+          python -m pip install aqtinstall
+          # Telecharge Qt 6.8.1 MSVC 2022 64-bit dans C:\Qt
+          python -m aqt install-qt windows desktop 6.8.1 win64_msvc2022_64 --outputdir C:\Qt
+          Write-Host "Qt installe"
+
+      - name: Copier Qt6 dans deps/qt6
+        shell: pwsh
+        run: |
+          $qt = "C:\Qt\6.8.1\msvc2022_64"
           Write-Host "Qt root: $qt"
+          if (-not (Test-Path $qt)) {
+            Write-Host "Contenu de C:\Qt :"
+            Get-ChildItem C:\Qt -Recurse -Depth 2 | Select-Object FullName
+            Write-Error "Dossier Qt introuvable a $qt"
+            exit 1
+          }
           New-Item -ItemType Directory -Force -Path deps/qt6 | Out-Null
-          Copy-Item "$qt/include" deps/qt6/include -Recurse -Force
-          Copy-Item "$qt/lib"     deps/qt6/lib     -Recurse -Force
-          Copy-Item "$qt/bin"     deps/qt6/bin     -Recurse -Force
-          Write-Host "Qt copié dans deps/qt6"
+          Copy-Item "$qt\include" deps/qt6/include -Recurse -Force
+          Copy-Item "$qt\lib"     deps/qt6/lib     -Recurse -Force
+          Copy-Item "$qt\bin"     deps/qt6/bin     -Recurse -Force
+          Write-Host "Qt copie dans deps/qt6"
 
       - name: Ajouter MSBuild au PATH
         uses: microsoft/setup-msbuild@v2
 
-      - name: Générer le projet Visual Studio (premake5)
+      - name: Generer le projet Visual Studio (premake5)
         shell: cmd
         run: tools\premake5.exe vs2022
 
@@ -48,23 +57,21 @@ jobs:
         shell: cmd
         run: msbuild build\Shield_launcher.sln /p:Configuration=Release /p:Platform=x64 /m
 
-      - name: Récupérer l'exe et les DLL
+      - name: Recuperer l'exe et les DLL
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifact | Out-Null
-          # cherche l'exe produit (le nom peut varier selon premake)
           $exe = Get-ChildItem -Recurse -Path build -Filter *.exe |
                  Where-Object { $_.FullName -match 'Release' } | Select-Object -First 1
           if ($exe) {
             Copy-Item $exe.FullName artifact/
-            Write-Host "EXE trouvé : $($exe.FullName)"
-            # copie les DLL Qt à côté
+            Write-Host "EXE trouve : $($exe.FullName)"
             Copy-Item deps/qt6/bin/*.dll artifact/ -Force -ErrorAction SilentlyContinue
           } else {
-            Write-Error "Aucun .exe trouvé dans build/ — vérifie les logs de compilation."
+            Write-Error "Aucun .exe trouve dans build/"
           }
 
-      - name: Publier l'artefact téléchargeable
+      - name: Publier l'artefact telechargeable
         uses: actions/upload-artifact@v4
         with:
           name: AlterCOD-Launcher
