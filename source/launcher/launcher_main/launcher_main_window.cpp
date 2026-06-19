@@ -12,6 +12,7 @@
 #include <QFrame>
 #include <QComboBox>
 #include <wininet.h>
+#include <tlhelp32.h>
 #include <regex>
 #pragma comment(lib, "wininet.lib")
 #include <QMetaObject>
@@ -22,6 +23,7 @@
 #include <QPropertyAnimation>
 #include <QEasingCurve>
 #include "embedded_fonts.hpp"
+#include "animated_background.hpp"
 
 namespace fs = std::filesystem;
 
@@ -97,6 +99,11 @@ progressBar(nullptr)
             backgroundLabel->setAlignment(Qt::AlignCenter);
         }
     }
+    // Fond animé (hexagones pulsants + particules dorées) par-dessus l'image
+    AnimatedBackground* animBg = new AnimatedBackground(this);
+    animBg->setFixedSize(800, 600);
+    animBg->move(0, 0);
+
     // voile sombre par-dessus le fond pour la lisibilité
     QLabel* overlay = new QLabel(this);
     overlay->setFixedSize(800, 600);
@@ -580,6 +587,43 @@ void MainWindow::startGame(bool isOnline, bool isVanilla) {
     onlineButton->setEnabled(true);
     offlineButton->setEnabled(true);
 
+    // ===== Comptage du temps de jeu (thread, marche même si launcher fermé) =====
+    {
+        std::string ldir = launcherDir.string();
+        std::thread([ldir]() {
+            time_t start = time(nullptr);
+            // Attendre que BlackOps4.exe se ferme
+            bool wasRunning = false;
+            for (;;) {
+                bool running = false;
+                HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+                if (snap != INVALID_HANDLE_VALUE) {
+                    PROCESSENTRY32 pe; pe.dwSize = sizeof(pe);
+                    if (Process32First(snap, &pe)) {
+                        do {
+                            if (_stricmp(pe.szExeFile, "BlackOps4.exe") == 0) { running = true; break; }
+                        } while (Process32Next(snap, &pe));
+                    }
+                    CloseHandle(snap);
+                }
+                if (running) wasRunning = true;
+                if (wasRunning && !running) break;   // le jeu s'est fermé
+                // sécurité : si le jeu n'a jamais démarré après 60s, on arrête
+                if (!wasRunning && (time(nullptr) - start) > 60) return;
+                std::this_thread::sleep_for(std::chrono::seconds(3));
+            }
+            // Ajouter le temps écoulé au total
+            time_t end = time(nullptr);
+            long long elapsed = (long long)(end - start);
+            if (elapsed < 0) elapsed = 0;
+            std::filesystem::path ptFile = std::filesystem::path(ldir) / "playtime.txt";
+            long long total = 0;
+            { std::ifstream in(ptFile); if (in) in >> total; }
+            total += elapsed;
+            { std::ofstream out(ptFile); out << total; }
+        }).detach();
+    }
+
 	// close launcher after starting game
     if (closeLauncherOnPlay)
 	    QTimer::singleShot(1000, this, &MainWindow::close);
@@ -1030,9 +1074,17 @@ bool MainWindow::copyLPCFolder() {
 
 void MainWindow::changeEvent(QEvent* event) {
     if (event->type() == QEvent::ActivationChange) {
-        if (this->isActiveWindow() && gameRunning) {
-            // L'utilisateur revient sur le launcher -> le jeu est probablement fermé
-            addPlaytimeAndRefresh();
+        if (this->isActiveWindow()) {
+            // Quand on revient sur le launcher : recharger le total depuis playtime.txt
+            QLabel* lbl = this->findChild<QLabel*>("playtimeLabel");
+            if (lbl) {
+                long long total = 0;
+                std::filesystem::path ptFile = std::filesystem::path(launcherDir) / "playtime.txt";
+                { std::ifstream in(ptFile); if (in) in >> total; }
+                long long h = total / 3600;
+                long long m = (total % 3600) / 60;
+                lbl->setText(QString("TEMPS DE JEU\n%1h %2min").arg(h).arg(m));
+            }
         }
     }
     QMainWindow::changeEvent(event);
