@@ -39,7 +39,7 @@ from PyQt5.QtCore import Qt, QUrl, QSize
 GITHUB_REPO = "bodnjenie14/Project_-bo4_Launcher"
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="AlterCOD Launcher")
+    parser = argparse.ArgumentParser(description="AlterBO4 Launcher")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--offline", "--solo", action="store_true", help="Start the game offline (solo mode)")
     group.add_argument("--online", "--multiplayer", action="store_true", help="Start the game offline (solo mode)")
@@ -350,7 +350,7 @@ class launcher(QWidget):
 
     def initUI(self):
         layout = QVBoxLayout()
-        self.setWindowTitle('AlterCOD Launcher')
+        self.setWindowTitle('AlterBO4 Launcher')
         self.setWindowIcon(QIcon(os.path.join(resources_dir, 'images', 'exe_icon_bo4.ico')))
 
         top_row_layout = QHBoxLayout()
@@ -854,7 +854,7 @@ class updater(QWidget):
 
     def initUI(self):
         layout = QVBoxLayout()
-        self.setWindowTitle('AlterCOD updater')
+        self.setWindowTitle('AlterBO4 updater')
         self.setWindowIcon(QIcon(os.path.join(resources_dir, 'images', 'exe_icon_bo4.ico')))
 
         background_label = QLabel(self)
