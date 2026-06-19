@@ -5,6 +5,7 @@
 #include <Windows.h>
 #include <QEvent>
 #include <QComboBox>
+#include <QVBoxLayout>
 #include <ctime>
 #pragma comment(lib, "winmm.lib")
 
@@ -64,6 +65,8 @@ private:
     void saveServerIp(const std::string& ip);
     void refreshServerInfo();
     QLabel* serverStatusLabel = nullptr;
+    QWidget* lobbyContainer = nullptr;
+    QVBoxLayout* lobbyLayout = nullptr;
     QComboBox* serverCombo = nullptr;
     QLabel* newsLabel = nullptr;
 };

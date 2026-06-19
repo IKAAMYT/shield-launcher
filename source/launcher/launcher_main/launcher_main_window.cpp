@@ -23,8 +23,77 @@
 #include <QPropertyAnimation>
 #include <QEasingCurve>
 #include "embedded_fonts.hpp"
+#include <QPainter>
+#include <QPolygonF>
+#include <QWidget>
 
 namespace fs = std::filesystem;
+
+// ============================================================
+//  FOND ANIMÉ (classe interne, sans Q_OBJECT donc sans moc)
+//  Hexagones qui pulsent + particules dorées. Léger (20 FPS).
+// ============================================================
+class AnimatedBackground : public QWidget {
+public:
+    AnimatedBackground(QWidget* parent = nullptr) : QWidget(parent) {
+        setAttribute(Qt::WA_TransparentForMouseEvents);
+        for (int i = 0; i < 26; ++i) {
+            Particle p;
+            p.x = (float)(rand() % 800);
+            p.y = (float)(rand() % 600);
+            p.speed = 0.2f + (rand() % 60) / 100.0f;
+            p.size = 1.0f + (rand() % 25) / 10.0f;
+            p.alpha = 0.05f + (rand() % 30) / 100.0f;
+            particles.push_back(p);
+        }
+        QTimer* t = new QTimer(this);
+        QObject::connect(t, &QTimer::timeout, this, [this]() { phase += 0.04f; tick(); update(); });
+        t->start(50);
+    }
+protected:
+    void paintEvent(QPaintEvent*) override {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        const QColor gold(242, 196, 17);
+        float r = 32.0f, dx = r * 1.732f, dy = r * 1.5f;
+        int row = 0;
+        for (float y = -r; y < height() + r; y += dy, ++row) {
+            float off = (row % 2) ? dx / 2 : 0;
+            for (float x = -r + off; x < width() + r; x += dx) {
+                float pulse = 0.5f + 0.5f * std::sin(phase + (x + y) * 0.01f);
+                QColor col = gold; col.setAlphaF(0.03f + pulse * 0.045f);
+                QPen pen(col); pen.setWidthF(1.0);
+                painter.setPen(pen); painter.setBrush(Qt::NoBrush);
+                painter.drawPolygon(hexagon(x, y, r - 3));
+            }
+        }
+        painter.setPen(Qt::NoPen);
+        for (auto& p : particles) {
+            QColor col = gold; col.setAlphaF(p.alpha);
+            painter.setBrush(col);
+            painter.drawEllipse(QPointF(p.x, p.y), p.size, p.size);
+        }
+    }
+private:
+    struct Particle { float x, y, speed, size, alpha; };
+    std::vector<Particle> particles;
+    float phase = 0.0f;
+    void tick() {
+        for (auto& p : particles) {
+            p.y -= p.speed;
+            p.x += std::sin(phase + p.y * 0.02f) * 0.2f;
+            if (p.y < -5) { p.y = (float)height() + 5; p.x = (float)(rand() % (width() > 0 ? width() : 800)); }
+        }
+    }
+    QPolygonF hexagon(float cx, float cy, float r) {
+        QPolygonF poly;
+        for (int i = 0; i < 6; ++i) {
+            float a = 3.14159265f / 180.0f * (60 * i - 30);
+            poly << QPointF(cx + r * std::cos(a), cy + r * std::sin(a));
+        }
+        return poly;
+    }
+};
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent),
 launcherDir(QCoreApplication::applicationDirPath().toStdWString()),
@@ -98,6 +167,11 @@ progressBar(nullptr)
             backgroundLabel->setAlignment(Qt::AlignCenter);
         }
     }
+    // Fond animé (hexagones + particules)
+    AnimatedBackground* animBg = new AnimatedBackground(this);
+    animBg->setFixedSize(800, 600);
+    animBg->move(0, 0);
+
     // voile sombre par-dessus le fond pour la lisibilité
     QLabel* overlay = new QLabel(this);
     overlay->setFixedSize(800, 600);
@@ -189,6 +263,24 @@ progressBar(nullptr)
         playtimeLabel->setText(QString("TEMPS DE JEU\n%1h %2min").arg(h).arg(m));
     }
     sideLayout->addWidget(playtimeLabel);
+
+    // ===== Succès basés sur le temps de jeu =====
+    {
+        long long total = 0;
+        fs::path ptFile = fs::path(launcherDir) / "playtime.txt";
+        if (fs::exists(ptFile)) { std::ifstream in(ptFile); if (in) in >> total; }
+        long long h = total / 3600;
+        QString rank, icon;
+        if (h >= 100)      { rank = "LEGENDE";    icon = "\xE2\x98\x85"; }   // ★
+        else if (h >= 50)  { rank = "VETERAN";    icon = "\xE2\x98\x85"; }
+        else if (h >= 25)  { rank = "EXPERT";     icon = "\xE2\x97\x86"; }   // ◆
+        else if (h >= 10)  { rank = "CONFIRME";   icon = "\xE2\x97\x86"; }
+        else if (h >= 1)   { rank = "RECRUE";     icon = "\xE2\x96\xB2"; }   // ▲
+        else               { rank = "BLEU";       icon = "\xE2\x96\xB2"; }
+        QLabel* rankLabel = new QLabel(QString::fromUtf8("%1  RANG : %2").arg(icon).arg(rank), this);
+        rankLabel->setStyleSheet("color: #ffd633; font-size: 11px; font-weight: bold; letter-spacing: 1px; padding: 2px 18px 6px 18px; background: transparent;");
+        sideLayout->addWidget(rankLabel);
+    }
 
     QFrame* sep = new QFrame(this);
     sep->setFrameShape(QFrame::HLine);
@@ -308,12 +400,17 @@ progressBar(nullptr)
     newsTitle->setStyleSheet("color: #f2c411; font-size: 12px; font-weight: bold; letter-spacing: 2px; background: transparent;");
     contentLayout->addWidget(newsTitle);
 
-    newsLabel = new QLabel("Chargement des news...", this);
-    newsLabel->setWordWrap(true);
-    newsLabel->setStyleSheet("color: #c8c6ba; font-size: 12px; background: rgba(10,10,8,140); border: 1px solid rgba(242,196,17,0.3); border-radius: 4px; padding: 10px;");
-    newsLabel->setMinimumHeight(70);
-    newsLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
-    contentLayout->addWidget(newsLabel);
+    // Conteneur dynamique de lobbies (boutons Rejoindre)
+    lobbyContainer = new QWidget(this);
+    lobbyContainer->setStyleSheet("background: rgba(10,10,8,140); border: 1px solid rgba(242,196,17,0.3); border-radius: 4px;");
+    lobbyLayout = new QVBoxLayout(lobbyContainer);
+    lobbyLayout->setContentsMargins(8, 8, 8, 8);
+    lobbyLayout->setSpacing(6);
+    lobbyContainer->setMinimumHeight(110);
+    QLabel* loadingLbl = new QLabel("Chargement des lobbies...", this);
+    loadingLbl->setStyleSheet("color: #c8c6ba; font-size: 12px; background: transparent; border: none;");
+    lobbyLayout->addWidget(loadingLbl);
+    contentLayout->addWidget(lobbyContainer);
 
     // Charger les infos serveur (dashboard) en direct, rafraîchi toutes les 30s
     QTimer* serverTimer = new QTimer(this);
@@ -472,6 +569,58 @@ void MainWindow::startGame(bool isOnline, bool isVanilla) {
     gameStartTime = time(nullptr);
     gameRunning = true;
 
+    // ===== Écran de chargement cinématique =====
+    {
+        QWidget* loadingScreen = new QWidget(this);
+        loadingScreen->setObjectName("loadingScreen");
+        loadingScreen->setFixedSize(800, 600);
+        loadingScreen->move(0, 0);
+        loadingScreen->setStyleSheet("background-color: rgba(5, 5, 6, 240);");
+        QVBoxLayout* ll = new QVBoxLayout(loadingScreen);
+        ll->setAlignment(Qt::AlignCenter);
+
+        QLabel* logo = new QLabel("ALTERCOD", loadingScreen);
+        logo->setAlignment(Qt::AlignCenter);
+        logo->setStyleSheet("color: #f2c411; font-size: 46px; font-weight: bold; letter-spacing: 6px; background: transparent;");
+        ll->addWidget(logo);
+
+        QLabel* status = new QLabel("Initialisation...", loadingScreen);
+        status->setObjectName("loadingStatus");
+        status->setAlignment(Qt::AlignCenter);
+        status->setStyleSheet("color: #c8c6ba; font-size: 14px; letter-spacing: 2px; background: transparent;");
+        ll->addWidget(status);
+
+        QProgressBar* lbar = new QProgressBar(loadingScreen);
+        lbar->setFixedWidth(360);
+        lbar->setTextVisible(false);
+        lbar->setRange(0, 100);
+        lbar->setValue(0);
+        lbar->setStyleSheet(
+            "QProgressBar { border: 1px solid #f2c411; border-radius: 4px; background: rgba(10,10,8,160); height: 10px; }"
+            "QProgressBar::chunk { background-color: #f2c411; border-radius: 3px; }");
+        ll->addWidget(lbar, 0, Qt::AlignCenter);
+
+        loadingScreen->show();
+        loadingScreen->raise();
+
+        // Messages cinématiques qui défilent
+        static const char* msgs[] = {
+            "Connexion au serveur AlterBO4...",
+            "Verification des fichiers...",
+            "Chargement des ressources...",
+            "Preparation du client...",
+            "Lancement du jeu..."
+        };
+        for (int i = 0; i <= 100; i += 4) {
+            lbar->setValue(i);
+            int idx = (i * 5) / 101;
+            if (idx < 5) status->setText(QString::fromUtf8(msgs[idx]));
+            QApplication::processEvents();
+            std::this_thread::sleep_for(std::chrono::milliseconds(45));
+        }
+        // L'écran sera retiré à la fin de startGame
+    }
+
     vanillaButton->setEnabled(false);
     onlineButton->setEnabled(false);
     offlineButton->setEnabled(false);
@@ -618,6 +767,12 @@ void MainWindow::startGame(bool isOnline, bool isVanilla) {
         }).detach();
     }
 
+    // Retirer l'écran de chargement
+    {
+        QWidget* ls = this->findChild<QWidget*>("loadingScreen");
+        if (ls) ls->deleteLater();
+    }
+
 	// close launcher after starting game
     if (closeLauncherOnPlay)
 	    QTimer::singleShot(1000, this, &MainWindow::close);
@@ -711,15 +866,17 @@ void MainWindow::refreshServerInfo() {
             std::regex rLobbies("LOBBYS ACTIVE[\\s\\S]*?<h6[^>]*>\\s*(\\d+)");
             if (std::regex_search(html, m, rLobbies)) lobbies = m[1];
 
-            // Lobbies : Hosted by X ... <td>MAP[MP/ZM] ... <td>N</td>
-            std::regex rLobby("Lobby_\\d+<sup>\\[Hosted by ([^\\]]+)\\][\\s\\S]*?<td>([^<]+)\\[(?:MP|ZM)\\]<sup>[\\s\\S]*?<td>(\\d+)</td>");
+            // Lobbies : Hosted by X ... <td>MAP[MP/ZM] ... <td>N</td> ... joinlobby&exInfo=ID
+            std::regex rLobby("Lobby_\\d+<sup>\\[Hosted by ([^\\]]+)\\][\\s\\S]*?<td>([^<]+)\\[(?:MP|ZM)\\]<sup>[\\s\\S]*?<td>(\\d+)</td>[\\s\\S]*?joinlobby&exInfo=(\\d+)");
             auto begin = std::sregex_iterator(html.begin(), html.end(), rLobby);
             auto end = std::sregex_iterator();
             for (auto it = begin; it != end; ++it) {
                 std::string host = (*it)[1];
                 std::string map = (*it)[2];
                 std::string pl = (*it)[3];
-                lobbyList += map + "  (" + host + ")  -  " + pl + " joueurs\n";
+                std::string id = (*it)[4];
+                // format : map|host|joueurs|id séparés par des tabulations, lobbies par \n
+                lobbyList += map + "\t" + host + "\t" + pl + "\t" + id + "\n";
             }
         } catch (...) {}
 
@@ -733,17 +890,60 @@ void MainWindow::refreshServerInfo() {
         else
             sideTxt = QString::fromUtf8("\xE2\x97\x8F  Serveur hors ligne");
 
-        QString lobbyTxt = QString::fromUtf8(lobbyList.c_str()).trimmed();
+        QString lobbyData = QString::fromUtf8(lobbyList.c_str()).trimmed();
         bool isOnline = online;
 
-        QMetaObject::invokeMethod(this, [this, sideTxt, lobbyTxt, isOnline]() {
+        QMetaObject::invokeMethod(this, [this, sideTxt, lobbyData, isOnline]() {
             if (serverStatusLabel) {
                 serverStatusLabel->setText(sideTxt);
                 serverStatusLabel->setStyleSheet(QString(
                     "color: %1; font-size: 11px; font-weight: bold; letter-spacing: 1px; padding: 4px 18px; background: transparent;")
                     .arg(isOnline ? "#39d98a" : "#d9534f"));
             }
-            if (newsLabel) newsLabel->setText(lobbyTxt);
+            // Vider l'ancienne liste
+            if (lobbyLayout) {
+                QLayoutItem* item;
+                while ((item = lobbyLayout->takeAt(0)) != nullptr) {
+                    if (item->widget()) item->widget()->deleteLater();
+                    delete item;
+                }
+                // Construire les boutons lobby
+                if (lobbyData.isEmpty() || !isOnline) {
+                    QLabel* lbl = new QLabel(isOnline ? "Aucun lobby actif." : "Serveur injoignable.", lobbyContainer);
+                    lbl->setStyleSheet("color: #c8c6ba; font-size: 12px; background: transparent; border: none;");
+                    lobbyLayout->addWidget(lbl);
+                } else {
+                    QStringList rows = lobbyData.split("\n", Qt::SkipEmptyParts);
+                    for (const QString& row : rows) {
+                        QStringList parts = row.split("\t");
+                        if (parts.size() < 4) continue;
+                        QString map = parts[0].trimmed();
+                        QString host = parts[1].trimmed();
+                        QString pl = parts[2].trimmed();
+                        QString id = parts[3].trimmed();
+
+                        QWidget* line = new QWidget(lobbyContainer);
+                        line->setStyleSheet("background: transparent;");
+                        QHBoxLayout* lh = new QHBoxLayout(line);
+                        lh->setContentsMargins(0,0,0,0);
+                        lh->setSpacing(8);
+                        QLabel* info = new QLabel(QString("%1  \xC2\xB7  %2 j  (%3)").arg(map).arg(pl).arg(host), line);
+                        info->setStyleSheet("color: #f5f3ea; font-size: 12px; font-weight: bold; background: transparent; border: none;");
+                        lh->addWidget(info, 1);
+                        QPushButton* joinBtn = new QPushButton("REJOINDRE", line);
+                        joinBtn->setStyleSheet(
+                            "QPushButton { background: #f2c411; color: #08080a; border: none; border-radius: 4px;"
+                            " padding: 5px 12px; font-size: 11px; font-weight: bold; letter-spacing: 1px; }"
+                            "QPushButton:hover { background: #ffd633; }");
+                        QString joinUrl = "http://70.55.126.7:8080/?action=joinlobby&exInfo=" + id;
+                        QObject::connect(joinBtn, &QPushButton::clicked, this, [joinUrl]() {
+                            QDesktopServices::openUrl(QUrl(joinUrl));
+                        });
+                        lh->addWidget(joinBtn);
+                        lobbyLayout->addWidget(line);
+                    }
+                }
+            }
         }, Qt::QueuedConnection);
     }).detach();
 }
