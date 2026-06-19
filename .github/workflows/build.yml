@@ -1,4 +1,4 @@
-name: Build AlterCOD Launcher
+name: Build AlterBO4 Launcher
 
 on:
   push:
@@ -36,12 +36,31 @@ jobs:
           Copy-Item "$qt\include" deps/qt6/include -Recurse -Force
           Copy-Item "$qt\lib"     deps/qt6/lib     -Recurse -Force
           Copy-Item "$qt\bin"     deps/qt6/bin     -Recurse -Force
-          Write-Host "Qt copie"
+
+      - name: Telecharger Discord RPC (lib precompilee)
+        shell: pwsh
+        run: |
+          $url = "https://github.com/discord/discord-rpc/releases/download/v3.4.0/discord-rpc-win.zip"
+          Invoke-WebRequest -Uri $url -OutFile discord-rpc-win.zip
+          Expand-Archive discord-rpc-win.zip -DestinationPath discord-rpc-tmp -Force
+          New-Item -ItemType Directory -Force -Path deps/discord-rpc/include | Out-Null
+          New-Item -ItemType Directory -Force -Path deps/discord-rpc/lib | Out-Null
+          # Le zip contient win64-dynamic/ et win64-static-release/ etc.
+          Write-Host "Contenu extrait :"
+          Get-ChildItem -Recurse discord-rpc-tmp | Select-Object FullName
+          # headers
+          Copy-Item discord-rpc-tmp/*/include/*.h deps/discord-rpc/include/ -Force -ErrorAction SilentlyContinue
+          Get-ChildItem -Recurse discord-rpc-tmp -Filter *.h | ForEach-Object { Copy-Item $_.FullName deps/discord-rpc/include/ -Force }
+          # lib + dll (on prend la version dynamique win64)
+          Get-ChildItem -Recurse discord-rpc-tmp -Filter discord-rpc.lib | ForEach-Object { Copy-Item $_.FullName deps/discord-rpc/lib/ -Force }
+          Get-ChildItem -Recurse discord-rpc-tmp -Filter discord-rpc.dll | ForEach-Object { Copy-Item $_.FullName deps/discord-rpc/lib/ -Force }
+          Write-Host "Discord RPC installe :"
+          Get-ChildItem -Recurse deps/discord-rpc | Select-Object FullName
 
       - name: Ajouter MSBuild au PATH
         uses: microsoft/setup-msbuild@v2
 
-      - name: Generer le projet Visual Studio (premake5)
+      - name: Generer le projet (premake5)
         shell: cmd
         run: tools\premake5.exe vs2022
 
@@ -49,39 +68,24 @@ jobs:
         shell: cmd
         run: msbuild build\Shield_launcher.sln /p:Configuration=Release /p:Platform=x64 /m
 
-      - name: Preparer le dossier de sortie (les 2 exe + DLL Qt)
+      - name: Preparer la sortie
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifact | Out-Null
-          # Recupere TOUT le dossier Release (contient Shield_Launcher.exe ET Launch Project BO4.exe)
-          $releaseDir = Get-ChildItem -Recurse -Path build -Directory |
-                        Where-Object { $_.FullName -match 'Release' -and $_.Name -eq 'Release' } |
-                        Select-Object -First 1
-          if (-not $releaseDir) {
-            $releaseDir = Get-ChildItem -Recurse -Path build -Directory |
-                          Where-Object { $_.FullName -match 'bin.*Release' } | Select-Object -First 1
-          }
-          Write-Host "Dossier Release : $($releaseDir.FullName)"
-          Get-ChildItem $releaseDir.FullName | ForEach-Object { Write-Host "  - $($_.Name)" }
-          # copie tous les exe trouves
           Get-ChildItem -Recurse -Path build -Filter *.exe |
             Where-Object { $_.FullName -match 'Release' } |
-            ForEach-Object { Copy-Item $_.FullName artifact/ -Force; Write-Host "EXE copie: $($_.Name)" }
-          # copie les DLL Qt
+            ForEach-Object { Copy-Item $_.FullName artifact/ -Force; Write-Host "EXE: $($_.Name)" }
           Copy-Item deps/qt6/bin/Qt6Core.dll, deps/qt6/bin/Qt6Gui.dll, deps/qt6/bin/Qt6Widgets.dll, deps/qt6/bin/Qt6Network.dll artifact/ -Force -ErrorAction SilentlyContinue
-          # plugins plateforme (necessaires pour l'affichage Qt)
           New-Item -ItemType Directory -Force -Path artifact/platforms | Out-Null
-          Copy-Item deps/qt6/plugins/platforms/qwindows.dll artifact/platforms/ -Force -ErrorAction SilentlyContinue
-          if (-not (Test-Path "deps/qt6/plugins/platforms/qwindows.dll")) {
-            # certains layouts mettent plugins ailleurs
-            $qwin = Get-ChildItem -Recurse -Path "C:\Qt" -Filter qwindows.dll | Select-Object -First 1
-            if ($qwin) { Copy-Item $qwin.FullName artifact/platforms/ -Force }
-          }
-          Write-Host "Contenu final de artifact/ :"
-          Get-ChildItem -Recurse artifact | ForEach-Object { Write-Host "  $($_.FullName)" }
+          $qwin = Get-ChildItem -Recurse -Path "C:\Qt" -Filter qwindows.dll | Select-Object -First 1
+          if ($qwin) { Copy-Item $qwin.FullName artifact/platforms/ -Force }
+          # DLL Discord RPC (necessaire au lancement)
+          Copy-Item deps/discord-rpc/lib/discord-rpc.dll artifact/ -Force -ErrorAction SilentlyContinue
+          Write-Host "Contenu artifact :"
+          Get-ChildItem -Recurse artifact | ForEach-Object { Write-Host "  $($_.Name)" }
 
       - name: Publier l'artefact
         uses: actions/upload-artifact@v4
         with:
-          name: AlterCOD-Launcher
+          name: AlterBO4-Launcher
           path: artifact/
