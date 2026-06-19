@@ -15,8 +15,8 @@
 namespace updater {
     const std::string SERVER_VERSION = "1.0.7";
 
-    const std::string GITHUB_API_URL = "https://api.github.com/repos/NotNierPea/shield-launcher/releases/latest";
-    const std::string DOWNLOAD_URL_BASE = "https://github.com/NotNierPea/shield-launcher/releases/download/";
+    const std::string GITHUB_API_URL = "https://api.github.com/repos/IKAAMYT/shield-launcher/releases/latest";
+    const std::string DOWNLOAD_URL_BASE = "https://github.com/IKAAMYT/shield-launcher/releases/download/";
 
     bool check_for_updates() {
         logger::write(logger::LOG_LEVEL_DEBUG, logger::LOG_LABEL_INITIALIZER, "Checking GitHub API: %s", GITHUB_API_URL.c_str());
