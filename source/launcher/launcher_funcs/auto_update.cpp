@@ -196,13 +196,15 @@ namespace updater {
             utils::configuration::WriteString("UpdateInfo", "LastPromptedVersion", assetName);
 
             QMessageBox msgBox(parent);
-            msgBox.setWindowTitle("Update Available");
-            msgBox.setText(QString("A new version (%1) is available. Your current version is %2.")
+            msgBox.setWindowTitle("Mise \u00e0 jour disponible");
+            msgBox.setText(QString("Une nouvelle version (%1) est disponible.\nVotre version actuelle est %2.")
                 .arg(QString::fromStdString(latestVersion))
                 .arg(QString::fromStdString(SERVER_VERSION)));
-            msgBox.setInformativeText("Do you want to update now?");
+            msgBox.setInformativeText("Voulez-vous mettre \u00e0 jour maintenant ?");
             msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
             msgBox.setDefaultButton(QMessageBox::Yes);
+            msgBox.setButtonText(QMessageBox::Yes, "Mettre \u00e0 jour");
+            msgBox.setButtonText(QMessageBox::No, "Plus tard");
 
             int ret = msgBox.exec();
 
@@ -300,44 +302,48 @@ namespace updater {
 
 
         std::string batchContent = "@echo off\r\n";
-        batchContent += "echo Waiting for launcher to close...\r\n";
+        batchContent += "echo Fermeture du launcher en cours...\r\n";
         batchContent += "ping -n 5 127.0.0.1 > nul\r\n"; 
 
-        batchContent += "echo Extracting update files...\r\n";
+        batchContent += "echo Extraction des fichiers de mise a jour...\r\n";
         batchContent += "powershell -Command \"Expand-Archive -Path '" + zipPath + "' -DestinationPath '" + updateDir + "' -Force\"\r\n";
         batchContent += "if %ERRORLEVEL% NEQ 0 (\r\n";
-        batchContent += "  echo Failed to extract update files!\r\n";
+        batchContent += "  echo Echec de l extraction des fichiers !\r\n";
         batchContent += "  pause\r\n";
         batchContent += "  exit /b 1\r\n";
         batchContent += ")\r\n";
 
-        batchContent += "echo Updating files...\r\n";
+        batchContent += "echo Mise a jour des fichiers...\r\n";
+        // Tuer le launcher et ATTENDRE qu'il soit vraiment ferme
         batchContent += "taskkill /f /im \"" + exeName + "\" > nul 2>&1\r\n";
-        batchContent += "ping -n 2 127.0.0.1 > nul\r\n";
+        batchContent += ":waitloop\r\n";
+        batchContent += "tasklist /fi \"imagename eq " + exeName + "\" 2>nul | find /i \"" + exeName + "\" >nul\r\n";
+        batchContent += "if not errorlevel 1 (\r\n";
+        batchContent += "  ping -n 2 127.0.0.1 > nul\r\n";
+        batchContent += "  goto waitloop\r\n";
+        batchContent += ")\r\n";
+        batchContent += "ping -n 3 127.0.0.1 > nul\r\n";
         
-        batchContent += "echo Checking for update files...\r\n";
+        batchContent += "echo Verification des fichiers...\r\n";
         batchContent += "if exist \"" + updateDir + "\\Project_BO4\\*\" (\r\n";
         batchContent += "  echo Found nested Project_BO4 folder\r\n";
-        batchContent += "  xcopy /s /y \"" + updateDir + "\\Project_BO4\\*\" \"" + projectDir + "\\\" > nul\r\n";
+        batchContent += "  xcopy /s /y /c /r /h /i \"" + updateDir + "\\Project_BO4\\*\" \"" + projectDir + "\\\" > nul\r\n";
         batchContent += ") else if exist \"" + updateDir + "\\project-bo4\\*\" (\r\n";
         batchContent += "  echo Found nested project-bo4 folder\r\n";
-        batchContent += "  xcopy /s /y \"" + updateDir + "\\project-bo4\\*\" \"" + projectDir + "\\\" > nul\r\n";
+        batchContent += "  xcopy /s /y /c /r /h /i \"" + updateDir + "\\project-bo4\\*\" \"" + projectDir + "\\\" > nul\r\n";
         batchContent += ") else if exist \"" + updateDir + "\\launcher\\*\" (\r\n";
         batchContent += "  echo Found launcher folder\r\n";
-        batchContent += "  xcopy /s /y \"" + updateDir + "\\launcher\\*\" \"" + exeDir + "\\\" > nul\r\n";
+        batchContent += "  xcopy /s /y /c /r /h /i \"" + updateDir + "\\launcher\\*\" \"" + exeDir + "\\\" > nul\r\n";
         batchContent += "  for /d %%i in (\"" + updateDir + "\\*\") do (\r\n";
-        batchContent += "    if not \"%%~nxi\"==\"launcher\" xcopy /s /y \"%%i\\*\" \"" + projectDir + "\\%%~nxi\\\" > nul\r\n";
+        batchContent += "    if not \"%%~nxi\"==\"launcher\" xcopy /s /y /c /r /h /i \"%%i\\*\" \"" + projectDir + "\\%%~nxi\\\" > nul\r\n";
         batchContent += "  )\r\n";
         batchContent += ") else (\r\n";
         batchContent += "  echo Using root folder\r\n";
-        batchContent += "  xcopy /s /y \"" + updateDir + "\\*\" \"" + projectDir + "\\\" > nul\r\n";
+        batchContent += "  xcopy /s /y /c /r /h /i \"" + updateDir + "\\*\" \"" + projectDir + "\\\" > nul\r\n";
         batchContent += ")\r\n";
         
-        batchContent += "if %ERRORLEVEL% NEQ 0 (\r\n";
-        batchContent += "  echo Failed to copy update files!\r\n";
-        batchContent += "  pause\r\n";
-        batchContent += "  exit /b 1\r\n";
-        batchContent += ")\r\n";
+        // xcopy avec /c continue malgre les erreurs mineures : on ne bloque plus toute la maj.
+        batchContent += "echo Copie terminee.\r\n";
 
         batchContent += "echo Cleaning up...\r\n";
         batchContent += "del \"" + zipPath + "\" > nul\r\n";
