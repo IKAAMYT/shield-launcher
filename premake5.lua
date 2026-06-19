@@ -124,12 +124,8 @@ project "launcher"
         "source/launcher",
         "source/utilities", 
 	    "build/src/", -- for pre generated qt moc files [NEEDED]
-        "%{prj.location}/source",
-        "deps/discord-rpc/include"  -- header Discord RPC AlterBO4
+        "%{prj.location}/source"
     }
-
-    libdirs { "deps/discord-rpc/lib" }   -- lib Discord RPC
-    links { "discord-rpc" }
 
     files 
     {
