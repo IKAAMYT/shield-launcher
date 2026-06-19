@@ -338,11 +338,19 @@ progressBar(nullptr)
     loadVolumeSettings();
     loadCloseLauncheronPlay();
 
-    // ===== Rich Presence Discord AlterBO4 =====
-    AlterRPC::init();
-    AlterRPC::update("Sur le launcher", "En ligne");
+    // ===== Rich Presence Discord AlterBO4 (différé + protégé) =====
+    QTimer::singleShot(1500, this, [this]() {
+        try {
+            AlterRPC::init();
+            AlterRPC::update("Sur le launcher", "En ligne");
+        } catch (...) {
+            // Si Discord absent/erreur : on ignore, le launcher marche quand même
+        }
+    });
 
     // ===== System Tray (barre près de l'horloge) =====
+    trayIcon = nullptr;
+    if (QSystemTrayIcon::isSystemTrayAvailable()) {
     trayIcon = new QSystemTrayIcon(this);
     {
         fs::path iconPath = fs::path(launcherDir) / "images" / "icon.ico";
@@ -380,6 +388,7 @@ progressBar(nullptr)
                 this->activateWindow();
             }
         });
+    } // fin if systemTrayAvailable
 }
 
 // Quand on lance le jeu OU qu'on ferme la fenetre : on minimise dans le tray
