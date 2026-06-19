@@ -583,7 +583,7 @@ void MainWindow::startGame(bool isOnline, bool isVanilla) {
 
     // ===== Comptage du temps de jeu (thread, marche même si launcher fermé) =====
     {
-        std::string ldir = launcherDir.string();
+        std::string ldir = std::filesystem::path(launcherDir).string();
         std::thread([ldir]() {
             time_t start = time(nullptr);
             // Attendre que BlackOps4.exe se ferme
