@@ -8,6 +8,10 @@
 #include "../launcher_funcs/json_utils.hpp"
 #include "../launcher_funcs/auto_update.hpp"
 #include <mmsystem.h>
+#include <QFontDatabase>
+#include <QFont>
+#include <QApplication>
+#include "embedded_fonts.hpp"
 
 namespace fs = std::filesystem;
 
@@ -33,6 +37,18 @@ progressBar(nullptr)
 {
     fs::create_directories(launcherDir);
     fs::create_directories(fs::path(launcherDir) / "sounds");
+
+    // ===== Police Rajdhani embarquee (DA AlterCOD) =====
+    {
+        QFontDatabase::addApplicationFontFromData(
+            QByteArray(reinterpret_cast<const char*>(rajdhani_medium_data), rajdhani_medium_size));
+        QFontDatabase::addApplicationFontFromData(
+            QByteArray(reinterpret_cast<const char*>(rajdhani_semibold_data), rajdhani_semibold_size));
+        QFontDatabase::addApplicationFontFromData(
+            QByteArray(reinterpret_cast<const char*>(rajdhani_bold_data), rajdhani_bold_size));
+        QFont appFont("Rajdhani", 10);
+        QApplication::setFont(appFont);
+    }
 
     setWindowTitle("AlterCOD Launcher");
     setFixedSize(800, 600);
@@ -159,13 +175,13 @@ progressBar(nullptr)
     contentLayout->setSpacing(0);
 
     // statut serveur (statique, indicateur visuel)
-    QLabel* statusLabel = new QLabel("\u25CF  CLIENT PRET", this);
+    QLabel* statusLabel = new QLabel(QString::fromUtf8("\xE2\x97\x8F  CLIENT PRET"), this);
     statusLabel->setStyleSheet("color: #39d98a; font-size: 12px; font-weight: bold; letter-spacing: 2px; background: transparent;");
     contentLayout->addWidget(statusLabel);
 
     contentLayout->addSpacing(10);
 
-    QLabel* subTitle = new QLabel("BLACK OPS 4 \u00B7 CLIENT", this);
+    QLabel* subTitle = new QLabel("BLACK OPS 4  -  CLIENT", this);
     subTitle->setStyleSheet("color: #c8c6ba; font-size: 13px; font-weight: bold; letter-spacing: 3px; background: transparent;");
     contentLayout->addWidget(subTitle);
 
@@ -181,7 +197,7 @@ progressBar(nullptr)
     QLabel* verBadge = new QLabel(QString("v%1").arg(QString::fromStdString(updater::get_server_version())), this);
     verBadge->setStyleSheet("color: #f2c411; border: 1px solid rgba(242,196,17,0.5); border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: bold; letter-spacing: 1px; background: transparent;");
     badgeRow->addWidget(verBadge);
-    QLabel* upToDate = new QLabel("\u00C0 JOUR", this);
+    QLabel* upToDate = new QLabel("A JOUR", this);
     upToDate->setStyleSheet("color: #39d98a; border: 1px solid rgba(57,217,138,0.5); border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: bold; letter-spacing: 1px; background: transparent;");
     badgeRow->addWidget(upToDate);
     badgeRow->addStretch();
@@ -234,7 +250,7 @@ progressBar(nullptr)
     QHBoxLayout* launchRow = new QHBoxLayout();
     launchRow->setSpacing(10);
 
-    onlineButton = new QPushButton("\u25B6  ONLINE", this);
+    onlineButton = new QPushButton(QString::fromUtf8("\xE2\x96\xB6  ONLINE"), this);
     onlineButton->setStyleSheet(
         "QPushButton { background: #f2c411; color: #08080a; border: none; border-radius: 5px;"
         " padding: 15px; font-size: 17px; font-weight: bold; letter-spacing: 3px; }"
