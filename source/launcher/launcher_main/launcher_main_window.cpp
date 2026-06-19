@@ -8,6 +8,12 @@
 #include "../launcher_funcs/json_utils.hpp"
 #include "../launcher_funcs/auto_update.hpp"
 #include <mmsystem.h>
+#include <fstream>
+#include <QFrame>
+#include <QComboBox>
+#include <wininet.h>
+#pragma comment(lib, "wininet.lib")
+#include <QMetaObject>
 #include <QFontDatabase>
 #include <QFont>
 #include <QApplication>
@@ -15,11 +21,6 @@
 #include <QPropertyAnimation>
 #include <QEasingCurve>
 #include "embedded_fonts.hpp"
-#include "alterbo4_rpc.hpp"
-#include <QSystemTrayIcon>
-#include <QMenu>
-#include <QAction>
-#include <QCloseEvent>
 
 namespace fs = std::filesystem;
 
@@ -164,14 +165,60 @@ progressBar(nullptr)
 
     sideLayout->addStretch();
 
-    // liens bas de sidebar : Discord + Docs
-    discordButton = new QPushButton("  DISCORD", this);
-    discordButton->setStyleSheet(sideBtn);
+    // ===== Compteur de temps de jeu total (en bas de la sidebar) =====
+    QLabel* playtimeLabel = new QLabel(this);
+    playtimeLabel->setObjectName("playtimeLabel");
+    playtimeLabel->setStyleSheet("color: #f2c411; font-size: 11px; font-weight: bold; letter-spacing: 1px; padding: 4px 18px; background: transparent;");
+    {
+        // Charger le total sauvegardé (en secondes) depuis playtime.txt
+        long long total = 0;
+        fs::path ptFile = fs::path(launcherDir) / "playtime.txt";
+        if (fs::exists(ptFile)) {
+            std::ifstream in(ptFile);
+            in >> total;
+        }
+        long long h = total / 3600;
+        long long m = (total % 3600) / 60;
+        playtimeLabel->setText(QString("TEMPS DE JEU\n%1h %2min").arg(h).arg(m));
+    }
+    sideLayout->addWidget(playtimeLabel);
+
+    QFrame* sep = new QFrame(this);
+    sep->setFrameShape(QFrame::HLine);
+    sep->setStyleSheet("color: rgba(242,196,17,0.2);");
+    sideLayout->addWidget(sep);
+
+    // ===== Réseaux avec compteurs (bas de sidebar) =====
+    const QString netBtn =
+        "QPushButton { background: transparent; color: #c8c6ba; border: none;"
+        " border-left: 3px solid transparent; text-align: left; padding: 8px 18px;"
+        " font-size: 12px; font-weight: bold; letter-spacing: 1px; }"
+        "QPushButton:hover { color: #f2c411; border-left: 3px solid #f2c411;"
+        " background: rgba(242,196,17,0.08); }";
+
+    discordButton = new QPushButton("  DISCORD   7 761", this);
+    discordButton->setStyleSheet(netBtn);
     sideLayout->addWidget(discordButton);
 
+    QPushButton* ytButton = new QPushButton("  YOUTUBE   10 010", this);
+    ytButton->setStyleSheet(netBtn);
+    sideLayout->addWidget(ytButton);
+
+    QPushButton* tiktokButton = new QPushButton("  TIKTOK   3 690", this);
+    tiktokButton->setStyleSheet(netBtn);
+    sideLayout->addWidget(tiktokButton);
+
     wikiButton = new QPushButton("  SITE / DOCS", this);
-    wikiButton->setStyleSheet(sideBtn);
+    wikiButton->setStyleSheet(netBtn);
     sideLayout->addWidget(wikiButton);
+
+    // liens réseaux (remplace TIKTOK_URL et YOUTUBE_URL par tes vraies chaines)
+    connect(ytButton, &QPushButton::clicked, this, []() {
+        QDesktopServices::openUrl(QUrl("https://www.youtube.com/@IKAAM"));
+    });
+    connect(tiktokButton, &QPushButton::clicked, this, []() {
+        QDesktopServices::openUrl(QUrl("https://www.tiktok.com/@ikaam"));
+    });
 
     rootLayout->addWidget(sidebar);
 
@@ -223,6 +270,69 @@ progressBar(nullptr)
     badgeRow->addWidget(upToDate);
     badgeRow->addStretch();
     contentLayout->addLayout(badgeRow);
+
+    contentLayout->addSpacing(16);
+
+    // ===== Sélecteur de serveur =====
+    QLabel* srvLabel = new QLabel("SERVEUR", this);
+    srvLabel->setStyleSheet("color: #8a8a82; font-size: 11px; font-weight: bold; letter-spacing: 2px; background: transparent;");
+    contentLayout->addWidget(srvLabel);
+
+    serverCombo = new QComboBox(this);
+    serverCombo->addItem("Serveur Principal  -  70.55.126.7", "70.55.126.7");
+    // Ajoute d'autres serveurs ici : serverCombo->addItem("Nom  -  IP", "IP");
+    serverCombo->setStyleSheet(
+        "QComboBox { background: rgba(10,10,8,200); color: #f5f3ea; border: 1px solid #f2c411;"
+        " border-radius: 4px; padding: 7px 10px; font-size: 13px; font-weight: bold; }"
+        "QComboBox::drop-down { border: none; width: 22px; }"
+        "QComboBox QAbstractItemView { background: #14140f; color: #f5f3ea;"
+        " border: 1px solid #f2c411; selection-background-color: #f2c411; selection-color: #08080a; }");
+    contentLayout->addWidget(serverCombo);
+    // quand on change de serveur, on écrit l'IP dans la config
+    connect(serverCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int) {
+        QString ip = serverCombo->currentData().toString();
+        if (!ip.isEmpty()) saveServerIp(ip.toStdString());
+    });
+
+    contentLayout->addSpacing(14);
+
+    // ===== Panneau NEWS (chargé depuis ikaam.fr) =====
+    QLabel* newsTitle = new QLabel("NEWS ALTERBO4", this);
+    newsTitle->setStyleSheet("color: #f2c411; font-size: 12px; font-weight: bold; letter-spacing: 2px; background: transparent;");
+    contentLayout->addWidget(newsTitle);
+
+    newsLabel = new QLabel("Chargement des news...", this);
+    newsLabel->setWordWrap(true);
+    newsLabel->setStyleSheet("color: #c8c6ba; font-size: 12px; background: rgba(10,10,8,140); border: 1px solid rgba(242,196,17,0.3); border-radius: 4px; padding: 10px;");
+    newsLabel->setMinimumHeight(70);
+    newsLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+    contentLayout->addWidget(newsLabel);
+
+    // Charger les news via WinINet (méthode native, comme l'updater) dans un thread
+    QTimer::singleShot(800, this, [this]() {
+        std::thread([this]() {
+            std::string result;
+            HINTERNET hNet = InternetOpenA("AlterBO4-Launcher", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+            if (hNet) {
+                HINTERNET hUrl = InternetOpenUrlA(hNet, "https://ikaam.fr/AlterCOD/news.txt",
+                    NULL, 0, INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE, 0);
+                if (hUrl) {
+                    char buf[2048]; DWORD read = 0;
+                    while (InternetReadFile(hUrl, buf, sizeof(buf) - 1, &read) && read > 0) {
+                        buf[read] = 0; result += buf;
+                    }
+                    InternetCloseHandle(hUrl);
+                }
+                InternetCloseHandle(hNet);
+            }
+            // Revenir sur le thread UI pour mettre à jour le label
+            QString txt = QString::fromUtf8(result.c_str()).trimmed();
+            QMetaObject::invokeMethod(this, [this, txt]() {
+                if (!txt.isEmpty()) newsLabel->setText(txt);
+                else newsLabel->setText("News indisponibles (hors ligne ?).");
+            }, Qt::QueuedConnection);
+        }).detach();
+    });
 
     contentLayout->addStretch();
 
@@ -337,77 +447,43 @@ progressBar(nullptr)
     // Charge les réglages sauvegardés
     loadVolumeSettings();
     loadCloseLauncheronPlay();
-
-    // ===== Rich Presence Discord AlterBO4 (différé + protégé) =====
-    QTimer::singleShot(1500, this, [this]() {
-        try {
-            AlterRPC::init();
-            AlterRPC::update("Sur le launcher", "En ligne");
-        } catch (...) {
-            // Si Discord absent/erreur : on ignore, le launcher marche quand même
-        }
-    });
-
-    // ===== System Tray (barre près de l'horloge) =====
-    trayIcon = nullptr;
-    if (QSystemTrayIcon::isSystemTrayAvailable()) {
-    trayIcon = new QSystemTrayIcon(this);
-    {
-        fs::path iconPath = fs::path(launcherDir) / "images" / "icon.ico";
-        if (fs::exists(iconPath))
-            trayIcon->setIcon(QIcon(QString::fromStdString(iconPath.string())));
-        else
-            trayIcon->setIcon(this->windowIcon());
-    }
-    trayIcon->setToolTip("AlterBO4 Launcher");
-
-    QMenu* trayMenu = new QMenu(this);
-    QAction* openAction = new QAction("Ouvrir", this);
-    QAction* quitAction = new QAction("Quitter", this);
-    trayMenu->addAction(openAction);
-    trayMenu->addSeparator();
-    trayMenu->addAction(quitAction);
-    trayIcon->setContextMenu(trayMenu);
-    trayIcon->show();
-
-    connect(openAction, &QAction::triggered, this, [this]() {
-        this->showNormal();
-        this->raise();
-        this->activateWindow();
-    });
-    connect(quitAction, &QAction::triggered, this, [this]() {
-        AlterRPC::shutdown();
-        qApp->quit();
-    });
-    // double-clic sur l'icone tray = rouvrir
-    connect(trayIcon, &QSystemTrayIcon::activated, this,
-        [this](QSystemTrayIcon::ActivationReason reason) {
-            if (reason == QSystemTrayIcon::DoubleClick) {
-                this->showNormal();
-                this->raise();
-                this->activateWindow();
-            }
-        });
-    } // fin if systemTrayAvailable
 }
 
-// Quand on lance le jeu OU qu'on ferme la fenetre : on minimise dans le tray
-// au lieu de quitter, pour garder le Rich Presence actif.
-void MainWindow::closeEvent(QCloseEvent* event) {
-    if (trayIcon && trayIcon->isVisible()) {
-        hide();
-        trayIcon->showMessage("AlterBO4 Launcher",
-            "Le launcher continue en arriere-plan (Rich Presence actif). Clic droit sur l\'icone pour quitter.",
-            QSystemTrayIcon::Information, 3000);
-        event->ignore();
-    } else {
-        AlterRPC::shutdown();
-        event->accept();
+
+void MainWindow::addPlaytimeAndRefresh() {
+    if (!gameRunning) return;
+    gameRunning = false;
+    time_t now = time(nullptr);
+    long long elapsed = (long long)(now - gameStartTime);
+    if (elapsed < 0) elapsed = 0;
+
+    // Charger l'ancien total
+    long long total = 0;
+    std::filesystem::path ptFile = std::filesystem::path(launcherDir) / "playtime.txt";
+    if (std::filesystem::exists(ptFile)) {
+        std::ifstream in(ptFile);
+        in >> total;
+    }
+    total += elapsed;
+    // Sauver
+    std::ofstream out(ptFile);
+    out << total;
+    out.close();
+
+    // Rafraîchir le label
+    QLabel* lbl = this->findChild<QLabel*>("playtimeLabel");
+    if (lbl) {
+        long long h = total / 3600;
+        long long m = (total % 3600) / 60;
+        lbl->setText(QString("TEMPS DE JEU\n%1h %2min").arg(h).arg(m));
     }
 }
-
 
 void MainWindow::startGame(bool isOnline, bool isVanilla) {
+
+    // Marque le début de session de jeu (pour le compteur de temps)
+    gameStartTime = time(nullptr);
+    gameRunning = true;
 
     vanillaButton->setEnabled(false);
     onlineButton->setEnabled(false);
@@ -580,6 +656,13 @@ void MainWindow::setName() {
             msgBox.exec();
         }
     }
+}
+
+void MainWindow::saveServerIp(const std::string& ip) {
+    std::string currentDir = QCoreApplication::applicationDirPath().toStdString();
+    std::filesystem::path gamePath = std::filesystem::path(currentDir);
+    std::string jsonPath = (gamePath / "project-bo4.json").string();
+    JsonUtils::replaceJsonValue(jsonPath, ip, "demonware", "ipv4");
 }
 
 void MainWindow::setIp() {
@@ -891,4 +974,14 @@ bool MainWindow::copyLPCFolder() {
     }
 
     return utils::copyDirectoryRecursive(sourceLPCPath.string(), destLPCPath.string());
+}
+
+void MainWindow::changeEvent(QEvent* event) {
+    if (event->type() == QEvent::ActivationChange) {
+        if (this->isActiveWindow() && gameRunning) {
+            // L'utilisateur revient sur le launcher -> le jeu est probablement fermé
+            addPlaytimeAndRefresh();
+        }
+    }
+    QMainWindow::changeEvent(event);
 }

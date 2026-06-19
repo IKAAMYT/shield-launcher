@@ -3,8 +3,9 @@
 #include "std_include.hpp"
 #include <string>
 #include <Windows.h>
-#include <QSystemTrayIcon>
-#include <QCloseEvent>
+#include <QEvent>
+#include <QComboBox>
+#include <ctime>
 #pragma comment(lib, "winmm.lib")
 
 class MainWindow : public QMainWindow {
@@ -24,7 +25,7 @@ private slots:
     void openSettings();
 
 protected:
-    void closeEvent(QCloseEvent* event) override;
+    void changeEvent(QEvent* event) override;
 
 private:
 
@@ -57,5 +58,10 @@ private:
     QLabel* volumeLabel;
     QSlider* volumeSlider;
     QProgressBar* progressBar;
-    QSystemTrayIcon* trayIcon;
+    time_t gameStartTime = 0;
+    bool gameRunning = false;
+    void addPlaytimeAndRefresh();
+    void saveServerIp(const std::string& ip);
+    QComboBox* serverCombo = nullptr;
+    QLabel* newsLabel = nullptr;
 };
