@@ -12,6 +12,7 @@
 #include <QFrame>
 #include <QComboBox>
 #include <wininet.h>
+#include <regex>
 #pragma comment(lib, "wininet.lib")
 #include <QMetaObject>
 #include <QFontDatabase>
@@ -165,6 +166,11 @@ progressBar(nullptr)
 
     sideLayout->addStretch();
 
+    // ===== Statut serveur compact (sidebar) =====
+    serverStatusLabel = new QLabel("  Connexion serveur...", this);
+    serverStatusLabel->setStyleSheet("color: #8a8a82; font-size: 11px; font-weight: bold; letter-spacing: 1px; padding: 4px 18px; background: transparent;");
+    sideLayout->addWidget(serverStatusLabel);
+
     // ===== Compteur de temps de jeu total (en bas de la sidebar) =====
     QLabel* playtimeLabel = new QLabel(this);
     playtimeLabel->setObjectName("playtimeLabel");
@@ -297,7 +303,7 @@ progressBar(nullptr)
     contentLayout->addSpacing(14);
 
     // ===== Panneau NEWS (chargé depuis ikaam.fr) =====
-    QLabel* newsTitle = new QLabel("NEWS ALTERBO4", this);
+    QLabel* newsTitle = new QLabel("LOBBIES EN DIRECT", this);
     newsTitle->setStyleSheet("color: #f2c411; font-size: 12px; font-weight: bold; letter-spacing: 2px; background: transparent;");
     contentLayout->addWidget(newsTitle);
 
@@ -308,31 +314,11 @@ progressBar(nullptr)
     newsLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
     contentLayout->addWidget(newsLabel);
 
-    // Charger les news via WinINet (méthode native, comme l'updater) dans un thread
-    QTimer::singleShot(800, this, [this]() {
-        std::thread([this]() {
-            std::string result;
-            HINTERNET hNet = InternetOpenA("AlterBO4-Launcher", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
-            if (hNet) {
-                HINTERNET hUrl = InternetOpenUrlA(hNet, "https://ikaam.fr/AlterCOD/news.txt",
-                    NULL, 0, INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE, 0);
-                if (hUrl) {
-                    char buf[2048]; DWORD read = 0;
-                    while (InternetReadFile(hUrl, buf, sizeof(buf) - 1, &read) && read > 0) {
-                        buf[read] = 0; result += buf;
-                    }
-                    InternetCloseHandle(hUrl);
-                }
-                InternetCloseHandle(hNet);
-            }
-            // Revenir sur le thread UI pour mettre à jour le label
-            QString txt = QString::fromUtf8(result.c_str()).trimmed();
-            QMetaObject::invokeMethod(this, [this, txt]() {
-                if (!txt.isEmpty()) newsLabel->setText(txt);
-                else newsLabel->setText("News indisponibles (hors ligne ?).");
-            }, Qt::QueuedConnection);
-        }).detach();
-    });
+    // Charger les infos serveur (dashboard) en direct, rafraîchi toutes les 30s
+    QTimer* serverTimer = new QTimer(this);
+    connect(serverTimer, &QTimer::timeout, this, &MainWindow::refreshServerInfo);
+    serverTimer->start(30000); // 30 secondes
+    QTimer::singleShot(800, this, &MainWindow::refreshServerInfo);
 
     contentLayout->addStretch();
 
@@ -656,6 +642,72 @@ void MainWindow::setName() {
             msgBox.exec();
         }
     }
+}
+
+void MainWindow::refreshServerInfo() {
+    std::thread([this]() {
+        std::string html;
+        HINTERNET hNet = InternetOpenA("AlterBO4-Launcher", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+        if (hNet) {
+            HINTERNET hUrl = InternetOpenUrlA(hNet, "http://70.55.126.7:8080/",
+                NULL, 0, INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE, 0);
+            if (hUrl) {
+                char buf[4096]; DWORD read = 0;
+                while (InternetReadFile(hUrl, buf, sizeof(buf) - 1, &read) && read > 0) {
+                    buf[read] = 0; html += buf;
+                }
+                InternetCloseHandle(hUrl);
+            }
+            InternetCloseHandle(hNet);
+        }
+
+        // --- Parsing ---
+        std::string players = "?", lobbies = "?";
+        std::string lobbyList;
+        bool online = !html.empty();
+
+        try {
+            std::smatch m;
+            std::regex rPlayers("PLAYERS ONLINE[\\s\\S]*?<h6[^>]*>\\s*(\\d+)");
+            if (std::regex_search(html, m, rPlayers)) players = m[1];
+            std::regex rLobbies("LOBBYS ACTIVE[\\s\\S]*?<h6[^>]*>\\s*(\\d+)");
+            if (std::regex_search(html, m, rLobbies)) lobbies = m[1];
+
+            // Lobbies : Hosted by X ... <td>MAP[MP/ZM] ... <td>N</td>
+            std::regex rLobby("Lobby_\\d+<sup>\\[Hosted by ([^\\]]+)\\][\\s\\S]*?<td>([^<]+)\\[(?:MP|ZM)\\]<sup>[\\s\\S]*?<td>(\\d+)</td>");
+            auto begin = std::sregex_iterator(html.begin(), html.end(), rLobby);
+            auto end = std::sregex_iterator();
+            for (auto it = begin; it != end; ++it) {
+                std::string host = (*it)[1];
+                std::string map = (*it)[2];
+                std::string pl = (*it)[3];
+                lobbyList += map + "  (" + host + ")  -  " + pl + " joueurs\n";
+            }
+        } catch (...) {}
+
+        if (lobbyList.empty()) lobbyList = online ? "Aucun lobby actif." : "Serveur injoignable.";
+
+        // --- Mise à jour UI ---
+        QString sideTxt;
+        if (online)
+            sideTxt = QString::fromUtf8("\xE2\x97\x8F  %1 EN LIGNE \xC2\xB7 %2 LOBBIES")
+                        .arg(QString::fromStdString(players)).arg(QString::fromStdString(lobbies));
+        else
+            sideTxt = QString::fromUtf8("\xE2\x97\x8F  Serveur hors ligne");
+
+        QString lobbyTxt = QString::fromUtf8(lobbyList.c_str()).trimmed();
+        bool isOnline = online;
+
+        QMetaObject::invokeMethod(this, [this, sideTxt, lobbyTxt, isOnline]() {
+            if (serverStatusLabel) {
+                serverStatusLabel->setText(sideTxt);
+                serverStatusLabel->setStyleSheet(QString(
+                    "color: %1; font-size: 11px; font-weight: bold; letter-spacing: 1px; padding: 4px 18px; background: transparent;")
+                    .arg(isOnline ? "#39d98a" : "#d9534f"));
+            }
+            if (newsLabel) newsLabel->setText(lobbyTxt);
+        }, Qt::QueuedConnection);
+    }).detach();
 }
 
 void MainWindow::saveServerIp(const std::string& ip) {

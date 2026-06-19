@@ -62,6 +62,8 @@ private:
     bool gameRunning = false;
     void addPlaytimeAndRefresh();
     void saveServerIp(const std::string& ip);
+    void refreshServerInfo();
+    QLabel* serverStatusLabel = nullptr;
     QComboBox* serverCombo = nullptr;
     QLabel* newsLabel = nullptr;
 };
