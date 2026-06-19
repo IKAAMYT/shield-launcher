@@ -11,6 +11,9 @@
 #include <QFontDatabase>
 #include <QFont>
 #include <QApplication>
+#include <QGraphicsOpacityEffect>
+#include <QPropertyAnimation>
+#include <QEasingCurve>
 #include "embedded_fonts.hpp"
 
 namespace fs = std::filesystem;
@@ -50,7 +53,7 @@ progressBar(nullptr)
         QApplication::setFont(appFont);
     }
 
-    setWindowTitle("AlterCOD Launcher");
+    setWindowTitle("AlterBO4 Launcher");
     setFixedSize(800, 600);
 
     HINSTANCE hInstance = GetModuleHandle(NULL);
@@ -177,6 +180,19 @@ progressBar(nullptr)
     // statut serveur (statique, indicateur visuel)
     QLabel* statusLabel = new QLabel(QString::fromUtf8("\xE2\x97\x8F  CLIENT PRET"), this);
     statusLabel->setStyleSheet("color: #39d98a; font-size: 12px; font-weight: bold; letter-spacing: 2px; background: transparent;");
+    // Animation : point vert qui clignote (pulsation douce de l'opacite)
+    {
+        QGraphicsOpacityEffect* statusFx = new QGraphicsOpacityEffect(statusLabel);
+        statusLabel->setGraphicsEffect(statusFx);
+        QPropertyAnimation* statusAnim = new QPropertyAnimation(statusFx, "opacity", this);
+        statusAnim->setDuration(1100);
+        statusAnim->setStartValue(1.0);
+        statusAnim->setKeyValueAt(0.5, 0.35);
+        statusAnim->setEndValue(1.0);
+        statusAnim->setLoopCount(-1);
+        statusAnim->setEasingCurve(QEasingCurve::InOutSine);
+        statusAnim->start();
+    }
     contentLayout->addWidget(statusLabel);
 
     contentLayout->addSpacing(10);
@@ -257,6 +273,19 @@ progressBar(nullptr)
         "QPushButton:hover { background: #ffd633; }"
         "QPushButton:disabled { background: rgba(242,196,17,0.3); color: rgba(8,8,10,0.5); }");
     launchRow->addWidget(onlineButton, 2);
+    // Animation : pulsation douce du bouton ONLINE (opacite qui respire)
+    {
+        QGraphicsOpacityEffect* onlineFx = new QGraphicsOpacityEffect(onlineButton);
+        onlineButton->setGraphicsEffect(onlineFx);
+        QPropertyAnimation* onlineAnim = new QPropertyAnimation(onlineFx, "opacity", this);
+        onlineAnim->setDuration(1600);
+        onlineAnim->setStartValue(1.0);
+        onlineAnim->setKeyValueAt(0.5, 0.72);
+        onlineAnim->setEndValue(1.0);
+        onlineAnim->setLoopCount(-1);
+        onlineAnim->setEasingCurve(QEasingCurve::InOutSine);
+        onlineAnim->start();
+    }
 
     offlineButton = new QPushButton("OFFLINE", this);
     offlineButton->setStyleSheet(
@@ -546,7 +575,7 @@ void MainWindow::openDiscord() {
 
 void MainWindow::openDocs() {
 
-    QDesktopServices::openUrl(QUrl("https://leikaam.fr/AlterCOD"));
+    QDesktopServices::openUrl(QUrl("https://ikaam.fr/AlterCOD"));
 }
 
 void MainWindow::updateVolume(int value) {
