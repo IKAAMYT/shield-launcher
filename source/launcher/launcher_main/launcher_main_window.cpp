@@ -15,6 +15,11 @@
 #include <QPropertyAnimation>
 #include <QEasingCurve>
 #include "embedded_fonts.hpp"
+#include "alterbo4_rpc.hpp"
+#include <QSystemTrayIcon>
+#include <QMenu>
+#include <QAction>
+#include <QCloseEvent>
 
 namespace fs = std::filesystem;
 
@@ -332,6 +337,64 @@ progressBar(nullptr)
     // Charge les réglages sauvegardés
     loadVolumeSettings();
     loadCloseLauncheronPlay();
+
+    // ===== Rich Presence Discord AlterBO4 =====
+    AlterRPC::init();
+    AlterRPC::update("Sur le launcher", "En ligne");
+
+    // ===== System Tray (barre près de l'horloge) =====
+    trayIcon = new QSystemTrayIcon(this);
+    {
+        fs::path iconPath = fs::path(launcherDir) / "images" / "icon.ico";
+        if (fs::exists(iconPath))
+            trayIcon->setIcon(QIcon(QString::fromStdString(iconPath.string())));
+        else
+            trayIcon->setIcon(this->windowIcon());
+    }
+    trayIcon->setToolTip("AlterBO4 Launcher");
+
+    QMenu* trayMenu = new QMenu(this);
+    QAction* openAction = new QAction("Ouvrir", this);
+    QAction* quitAction = new QAction("Quitter", this);
+    trayMenu->addAction(openAction);
+    trayMenu->addSeparator();
+    trayMenu->addAction(quitAction);
+    trayIcon->setContextMenu(trayMenu);
+    trayIcon->show();
+
+    connect(openAction, &QAction::triggered, this, [this]() {
+        this->showNormal();
+        this->raise();
+        this->activateWindow();
+    });
+    connect(quitAction, &QAction::triggered, this, [this]() {
+        AlterRPC::shutdown();
+        qApp->quit();
+    });
+    // double-clic sur l'icone tray = rouvrir
+    connect(trayIcon, &QSystemTrayIcon::activated, this,
+        [this](QSystemTrayIcon::ActivationReason reason) {
+            if (reason == QSystemTrayIcon::DoubleClick) {
+                this->showNormal();
+                this->raise();
+                this->activateWindow();
+            }
+        });
+}
+
+// Quand on lance le jeu OU qu'on ferme la fenetre : on minimise dans le tray
+// au lieu de quitter, pour garder le Rich Presence actif.
+void MainWindow::closeEvent(QCloseEvent* event) {
+    if (trayIcon && trayIcon->isVisible()) {
+        hide();
+        trayIcon->showMessage("AlterBO4 Launcher",
+            "Le launcher continue en arriere-plan (Rich Presence actif). Clic droit sur l\'icone pour quitter.",
+            QSystemTrayIcon::Information, 3000);
+        event->ignore();
+    } else {
+        AlterRPC::shutdown();
+        event->accept();
+    }
 }
 
 

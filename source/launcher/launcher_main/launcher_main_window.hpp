@@ -3,6 +3,8 @@
 #include "std_include.hpp"
 #include <string>
 #include <Windows.h>
+#include <QSystemTrayIcon>
+#include <QCloseEvent>
 #pragma comment(lib, "winmm.lib")
 
 class MainWindow : public QMainWindow {
@@ -20,6 +22,9 @@ private slots:
     void openDocs();
     void updateVolume(int value);
     void openSettings();
+
+protected:
+    void closeEvent(QCloseEvent* event) override;
 
 private:
 
@@ -52,4 +57,5 @@ private:
     QLabel* volumeLabel;
     QSlider* volumeSlider;
     QProgressBar* progressBar;
+    QSystemTrayIcon* trayIcon;
 };
