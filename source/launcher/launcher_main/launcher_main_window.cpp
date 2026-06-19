@@ -23,7 +23,6 @@
 #include <QPropertyAnimation>
 #include <QEasingCurve>
 #include "embedded_fonts.hpp"
-#include "animated_background.hpp"
 
 namespace fs = std::filesystem;
 
@@ -99,11 +98,6 @@ progressBar(nullptr)
             backgroundLabel->setAlignment(Qt::AlignCenter);
         }
     }
-    // Fond animé (hexagones pulsants + particules dorées) par-dessus l'image
-    AnimatedBackground* animBg = new AnimatedBackground(this);
-    animBg->setFixedSize(800, 600);
-    animBg->move(0, 0);
-
     // voile sombre par-dessus le fond pour la lisibilité
     QLabel* overlay = new QLabel(this);
     overlay->setFixedSize(800, 600);
