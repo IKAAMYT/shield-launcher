@@ -37,26 +37,6 @@ jobs:
           Copy-Item "$qt\lib"     deps/qt6/lib     -Recurse -Force
           Copy-Item "$qt\bin"     deps/qt6/bin     -Recurse -Force
 
-      - name: Telecharger Discord RPC (lib precompilee)
-        shell: pwsh
-        run: |
-          $url = "https://github.com/discord/discord-rpc/releases/download/v3.4.0/discord-rpc-win.zip"
-          Invoke-WebRequest -Uri $url -OutFile discord-rpc-win.zip
-          Expand-Archive discord-rpc-win.zip -DestinationPath discord-rpc-tmp -Force
-          New-Item -ItemType Directory -Force -Path deps/discord-rpc/include | Out-Null
-          New-Item -ItemType Directory -Force -Path deps/discord-rpc/lib | Out-Null
-          # Le zip contient win64-dynamic/ et win64-static-release/ etc.
-          Write-Host "Contenu extrait :"
-          Get-ChildItem -Recurse discord-rpc-tmp | Select-Object FullName
-          # headers
-          Copy-Item discord-rpc-tmp/*/include/*.h deps/discord-rpc/include/ -Force -ErrorAction SilentlyContinue
-          Get-ChildItem -Recurse discord-rpc-tmp -Filter *.h | ForEach-Object { Copy-Item $_.FullName deps/discord-rpc/include/ -Force }
-          # lib + dll (on prend la version dynamique win64)
-          Get-ChildItem -Recurse discord-rpc-tmp -Filter discord-rpc.lib | ForEach-Object { Copy-Item $_.FullName deps/discord-rpc/lib/ -Force }
-          Get-ChildItem -Recurse discord-rpc-tmp -Filter discord-rpc.dll | ForEach-Object { Copy-Item $_.FullName deps/discord-rpc/lib/ -Force }
-          Write-Host "Discord RPC installe :"
-          Get-ChildItem -Recurse deps/discord-rpc | Select-Object FullName
-
       - name: Ajouter MSBuild au PATH
         uses: microsoft/setup-msbuild@v2
 
@@ -79,9 +59,6 @@ jobs:
           New-Item -ItemType Directory -Force -Path artifact/platforms | Out-Null
           $qwin = Get-ChildItem -Recurse -Path "C:\Qt" -Filter qwindows.dll | Select-Object -First 1
           if ($qwin) { Copy-Item $qwin.FullName artifact/platforms/ -Force }
-          # DLL Discord RPC (necessaire au lancement)
-          Copy-Item deps/discord-rpc/lib/discord-rpc.dll artifact/ -Force -ErrorAction SilentlyContinue
-          Write-Host "Contenu artifact :"
           Get-ChildItem -Recurse artifact | ForEach-Object { Write-Host "  $($_.Name)" }
 
       - name: Publier l'artefact
