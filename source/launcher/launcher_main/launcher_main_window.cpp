@@ -1,3 +1,5 @@
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include "std_include.hpp"
 #include "launcher_main_window.hpp"
 #include "style.hpp"
@@ -12,10 +14,16 @@
 #include <QFrame>
 #include <QComboBox>
 #include <wininet.h>
+#pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "wininet.lib")
 #include <tlhelp32.h>
 #include <regex>
-#pragma comment(lib, "wininet.lib")
 #include <QMetaObject>
+#include <QDialog>
+#include <QScrollBar>
+#include <QLineEdit>
+#include <QTextEdit>
+#include <QAbstractAnimation>
 #include <QFontDatabase>
 #include <QFont>
 #include <QApplication>
@@ -249,6 +257,20 @@ progressBar(nullptr)
         std::string path = gameDir.string();
         ShellExecuteA(NULL, "open", path.c_str(), NULL, NULL, SW_SHOWNORMAL);
     });
+
+    // Bouton : signaler un bug (ouvre le Discord)
+    QPushButton* bugButton = new QPushButton("  SIGNALER UN BUG", this);
+    bugButton->setStyleSheet(sideBtn);
+    sideLayout->addWidget(bugButton);
+    connect(bugButton, &QPushButton::clicked, this, [this]() {
+        ShellExecuteA(NULL, "open", "https://discord.gg/v9v5DHPYBR", NULL, NULL, SW_SHOWNORMAL);
+    });
+
+    // Bouton : chat communautaire
+    QPushButton* chatButton = new QPushButton("  CHAT", this);
+    chatButton->setStyleSheet(sideBtn);
+    sideLayout->addWidget(chatButton);
+    connect(chatButton, &QPushButton::clicked, this, &MainWindow::openChat);
 
     sideLayout->addStretch();
 
@@ -553,6 +575,52 @@ progressBar(nullptr)
     // Charge les réglages sauvegardés
     loadVolumeSettings();
     loadCloseLauncheronPlay();
+
+    // ===== SPLASH ANIMÉ AU DÉMARRAGE =====
+    {
+        QWidget* splash = new QWidget(this);
+        splash->setObjectName("splashScreen");
+        splash->setFixedSize(800, 600);
+        splash->move(0, 0);
+        splash->setStyleSheet("background-color: #050506;");
+        QVBoxLayout* sl = new QVBoxLayout(splash);
+        sl->setAlignment(Qt::AlignCenter);
+
+        QLabel* splashTitle = new QLabel("ALTERBO4", splash);
+        splashTitle->setAlignment(Qt::AlignCenter);
+        splashTitle->setStyleSheet("color: #f2c411; font-size: 60px; font-weight: bold; letter-spacing: 10px; background: transparent;");
+        sl->addWidget(splashTitle);
+
+        QLabel* splashSub = new QLabel("LAUNCHER", splash);
+        splashSub->setAlignment(Qt::AlignCenter);
+        splashSub->setStyleSheet("color: #8a8a82; font-size: 16px; letter-spacing: 8px; background: transparent;");
+        sl->addWidget(splashSub);
+
+        splash->show();
+        splash->raise();
+
+        // Fondu d'apparition du titre
+        QGraphicsOpacityEffect* eff = new QGraphicsOpacityEffect(splashTitle);
+        splashTitle->setGraphicsEffect(eff);
+        QPropertyAnimation* fadeIn = new QPropertyAnimation(eff, "opacity");
+        fadeIn->setDuration(700);
+        fadeIn->setStartValue(0.0);
+        fadeIn->setEndValue(1.0);
+        fadeIn->setEasingCurve(QEasingCurve::OutCubic);
+        fadeIn->start(QAbstractAnimation::DeleteWhenStopped);
+
+        // Disparition du splash après 1.6s (fondu de sortie)
+        QTimer::singleShot(1600, this, [splash]() {
+            QGraphicsOpacityEffect* outEff = new QGraphicsOpacityEffect(splash);
+            splash->setGraphicsEffect(outEff);
+            QPropertyAnimation* fadeOut = new QPropertyAnimation(outEff, "opacity");
+            fadeOut->setDuration(500);
+            fadeOut->setStartValue(1.0);
+            fadeOut->setEndValue(0.0);
+            QObject::connect(fadeOut, &QPropertyAnimation::finished, splash, &QWidget::deleteLater);
+            fadeOut->start(QAbstractAnimation::DeleteWhenStopped);
+        });
+    }
 }
 
 
@@ -892,8 +960,171 @@ void MainWindow::setName() {
     }
 }
 
+// ============================================================
+//  CHAT COMMUNAUTAIRE (backend chat.php sur ikaam.fr)
+// ============================================================
+void MainWindow::openChat() {
+    QDialog* dlg = new QDialog(this);
+    dlg->setWindowTitle(QString::fromUtf8("Chat AlterBO4"));
+    dlg->setFixedSize(460, 560);
+    dlg->setStyleSheet(
+        "QDialog{background:#0a0a08;}"
+        "QTextEdit{background:#111110;color:#e8e6da;border:1px solid rgba(242,196,17,.3);border-radius:6px;font-size:13px;}"
+        "QLineEdit{background:#15140f;color:#fff;border:1px solid rgba(242,196,17,.4);border-radius:6px;padding:8px;font-size:13px;}"
+        "QPushButton{background:#f2c411;color:#08080a;border:none;border-radius:6px;padding:8px 16px;font-weight:bold;}"
+        "QPushButton:hover{background:#ffd633;}"
+        "QLabel{color:#f2c411;font-weight:bold;font-size:14px;letter-spacing:1px;}");
+    WindowUtils::setWindowIcon(dlg);
+
+    QVBoxLayout* lay = new QVBoxLayout(dlg);
+    QLabel* title = new QLabel(QString::fromUtf8("\xF0\x9F\x92\xAC  CHAT COMMUNAUTAIRE"), dlg);
+    lay->addWidget(title);
+
+    QTextEdit* msgArea = new QTextEdit(dlg);
+    msgArea->setReadOnly(true);
+    lay->addWidget(msgArea, 1);
+
+    QHBoxLayout* inputRow = new QHBoxLayout();
+    QLineEdit* input = new QLineEdit(dlg);
+    input->setPlaceholderText(QString::fromUtf8("\xC3\x89cris un message..."));
+    input->setMaxLength(300);
+    QPushButton* sendBtn = new QPushButton("Envoyer", dlg);
+    inputRow->addWidget(input, 1);
+    inputRow->addWidget(sendBtn);
+    lay->addLayout(inputRow);
+
+    // Récupérer le pseudo depuis project-bo4.json (identity.name)
+    auto getPseudo = [this]() -> std::string {
+        std::string currentDir = QCoreApplication::applicationDirPath().toStdString();
+        fs::path gamePath = fs::path(currentDir);
+        if (!fs::exists(gamePath / "project-bo4.json")) {
+            fs::path pp = gamePath.parent_path().parent_path();
+            if (fs::exists(pp / "project-bo4.json")) gamePath = pp;
+        }
+        std::string jsonPath = (gamePath / "project-bo4.json").string();
+        std::string n = JsonUtils::getJsonItem(jsonPath, "identity", "name");
+        if (n.empty()) n = "Joueur";
+        return n;
+    };
+
+    // Fonction de rafraîchissement des messages (GET chat.php)
+    auto refreshMessages = [msgArea]() {
+        std::thread([msgArea]() {
+            std::string json;
+            HINTERNET hNet = InternetOpenA("AlterBO4-Chat", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+            if (hNet) {
+                HINTERNET hUrl = InternetOpenUrlA(hNet, "https://ikaam.fr/chat.php",
+                    NULL, 0, INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE | INTERNET_FLAG_SECURE, 0);
+                if (hUrl) {
+                    char buf[4096]; DWORD read = 0;
+                    while (InternetReadFile(hUrl, buf, sizeof(buf)-1, &read) && read > 0) { buf[read]=0; json += buf; }
+                    InternetCloseHandle(hUrl);
+                }
+                InternetCloseHandle(hNet);
+            }
+            // Parsing simple des messages (name + msg)
+            QString html;
+            try {
+                std::regex rMsg("\"name\":\"(.*?)\",\"msg\":\"(.*?)\",\"ts\"");
+                auto begin = std::sregex_iterator(json.begin(), json.end(), rMsg);
+                auto end = std::sregex_iterator();
+                for (auto it = begin; it != end; ++it) {
+                    std::string nm = (*it)[1], ms = (*it)[2];
+                    // déséchapper \/ et unicode basique
+                    QString qn = QString::fromUtf8(nm.c_str());
+                    QString qm = QString::fromUtf8(ms.c_str());
+                    qm.replace("\\/", "/").replace("\\\"", "\"");
+                    qn.replace("\\/", "/");
+                    html += "<b style='color:#f2c411'>" + qn.toHtmlEscaped() + "</b> : " + qm.toHtmlEscaped() + "<br>";
+                }
+            } catch (...) {}
+            if (html.isEmpty()) html = "<i style='color:#888'>Aucun message. Sois le premier !</i>";
+            QMetaObject::invokeMethod(msgArea, [msgArea, html]() {
+                int sb = msgArea->verticalScrollBar()->value();
+                bool atBottom = (sb >= msgArea->verticalScrollBar()->maximum() - 4);
+                msgArea->setHtml(html);
+                if (atBottom) msgArea->verticalScrollBar()->setValue(msgArea->verticalScrollBar()->maximum());
+            }, Qt::QueuedConnection);
+        }).detach();
+    };
+
+    // Envoi d'un message (POST chat.php)
+    auto sendMessage = [input, getPseudo, refreshMessages]() {
+        QString text = input->text().trimmed();
+        if (text.isEmpty()) return;
+        std::string pseudo = getPseudo();
+        std::string msg = text.toStdString();
+        input->clear();
+        std::thread([pseudo, msg, refreshMessages]() {
+            // URL-encode minimal
+            auto enc = [](const std::string& s) {
+                std::string out;
+                char hex[4];
+                for (unsigned char ch : s) {
+                    if (isalnum(ch) || ch=='-'||ch=='_'||ch=='.'||ch=='~') out += ch;
+                    else { sprintf(hex, "%%%02X", ch); out += hex; }
+                }
+                return out;
+            };
+            std::string post = "name=" + enc(pseudo) + "&msg=" + enc(msg);
+            HINTERNET hNet = InternetOpenA("AlterBO4-Chat", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+            if (hNet) {
+                HINTERNET hCon = InternetConnectA(hNet, "ikaam.fr", INTERNET_DEFAULT_HTTPS_PORT, NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0);
+                if (hCon) {
+                    HINTERNET hReq = HttpOpenRequestA(hCon, "POST", "/chat.php", NULL, NULL, NULL, INTERNET_FLAG_SECURE, 0);
+                    if (hReq) {
+                        std::string headers = "Content-Type: application/x-www-form-urlencoded";
+                        HttpSendRequestA(hReq, headers.c_str(), (DWORD)headers.size(), (LPVOID)post.c_str(), (DWORD)post.size());
+                        InternetCloseHandle(hReq);
+                    }
+                    InternetCloseHandle(hCon);
+                }
+                InternetCloseHandle(hNet);
+            }
+            // Rafraîchir après envoi
+            refreshMessages();
+        }).detach();
+    };
+
+    QObject::connect(sendBtn, &QPushButton::clicked, dlg, [sendMessage]() { sendMessage(); });
+    QObject::connect(input, &QLineEdit::returnPressed, dlg, [sendMessage]() { sendMessage(); });
+
+    // Timer de rafraîchissement (5s)
+    QTimer* chatTimer = new QTimer(dlg);
+    QObject::connect(chatTimer, &QTimer::timeout, dlg, [refreshMessages]() { refreshMessages(); });
+    chatTimer->start(5000);
+    refreshMessages(); // premier chargement
+
+    dlg->exec();
+}
+
 void MainWindow::refreshServerInfo() {
     std::thread([this]() {
+        // --- Mesure du ping (temps de connexion TCP au serveur) ---
+        long pingMs = -1;
+        {
+            WSADATA wsa;
+            if (WSAStartup(MAKEWORD(2,2), &wsa) == 0) {
+                SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+                if (sock != INVALID_SOCKET) {
+                    // mode non-bloquant pour timeout
+                    u_long mode = 1; ioctlsocket(sock, FIONBIO, &mode);
+                    sockaddr_in addr; addr.sin_family = AF_INET; addr.sin_port = htons(8080);
+                    addr.sin_addr.s_addr = inet_addr("70.55.126.7");
+                    auto t0 = std::chrono::steady_clock::now();
+                    connect(sock, (sockaddr*)&addr, sizeof(addr));
+                    fd_set wset; FD_ZERO(&wset); FD_SET(sock, &wset);
+                    timeval tv; tv.tv_sec = 2; tv.tv_usec = 0;
+                    if (select(0, NULL, &wset, NULL, &tv) > 0) {
+                        auto t1 = std::chrono::steady_clock::now();
+                        pingMs = (long)std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+                    }
+                    closesocket(sock);
+                }
+                WSACleanup();
+            }
+        }
+
         std::string html;
         HINTERNET hNet = InternetOpenA("AlterBO4-Launcher", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
         if (hNet) {
@@ -947,10 +1178,12 @@ void MainWindow::refreshServerInfo() {
 
         QString lobbyData = QString::fromUtf8(lobbyList.c_str()).trimmed();
         bool isOnline = online;
+        QString pingTxt = (pingMs >= 0) ? QString("  \xE2\x80\xA2  %1 ms").arg(pingMs) : QString();
+        QString sideTxtFull = sideTxt + (isOnline ? pingTxt : QString());
 
-        QMetaObject::invokeMethod(this, [this, sideTxt, lobbyData, isOnline]() {
+        QMetaObject::invokeMethod(this, [this, sideTxtFull, lobbyData, isOnline]() {
             if (serverStatusLabel) {
-                serverStatusLabel->setText(sideTxt);
+                serverStatusLabel->setText(sideTxtFull);
                 serverStatusLabel->setStyleSheet(QString(
                     "color: %1; font-size: 11px; font-weight: bold; letter-spacing: 1px; padding: 4px 18px; background: transparent;")
                     .arg(isOnline ? "#39d98a" : "#d9534f"));

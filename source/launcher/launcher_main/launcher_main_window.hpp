@@ -64,6 +64,7 @@ private:
     void addPlaytimeAndRefresh();
     void saveServerIp(const std::string& ip);
     void refreshServerInfo();
+    void openChat();
     QLabel* serverStatusLabel = nullptr;
     QWidget* lobbyContainer = nullptr;
     QVBoxLayout* lobbyLayout = nullptr;
