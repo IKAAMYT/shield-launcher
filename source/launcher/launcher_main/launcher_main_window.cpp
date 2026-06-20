@@ -1,3 +1,5 @@
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include "std_include.hpp"
@@ -986,7 +988,7 @@ void MainWindow::openChat() {
 
     QHBoxLayout* inputRow = new QHBoxLayout();
     QLineEdit* input = new QLineEdit(dlg);
-    input->setPlaceholderText(QString::fromUtf8("\xC3\x89cris un message..."));
+    input->setPlaceholderText(QString::fromUtf8("\xC3\x89" "cris un message..."));
     input->setMaxLength(300);
     QPushButton* sendBtn = new QPushButton("Envoyer", dlg);
     inputRow->addWidget(input, 1);
@@ -1112,7 +1114,7 @@ void MainWindow::refreshServerInfo() {
                     sockaddr_in addr; addr.sin_family = AF_INET; addr.sin_port = htons(8080);
                     addr.sin_addr.s_addr = inet_addr("70.55.126.7");
                     auto t0 = std::chrono::steady_clock::now();
-                    connect(sock, (sockaddr*)&addr, sizeof(addr));
+                    ::connect(sock, (sockaddr*)&addr, sizeof(addr));
                     fd_set wset; FD_ZERO(&wset); FD_SET(sock, &wset);
                     timeval tv; tv.tv_sec = 2; tv.tv_usec = 0;
                     if (select(0, NULL, &wset, NULL, &tv) > 0) {
