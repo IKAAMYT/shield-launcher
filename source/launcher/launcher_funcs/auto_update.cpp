@@ -13,7 +13,7 @@
 #include <filesystem>
 
 namespace updater {
-    const std::string SERVER_VERSION = "2.0.3";
+    const std::string SERVER_VERSION = "2.0.4";
 
     const std::string GITHUB_API_URL = "https://api.github.com/repos/IKAAMYT/shield-launcher/releases/latest";
     const std::string DOWNLOAD_URL_BASE = "https://github.com/IKAAMYT/shield-launcher/releases/download/";
@@ -196,14 +196,14 @@ namespace updater {
             utils::configuration::WriteString("UpdateInfo", "LastPromptedVersion", assetName);
 
             QMessageBox msgBox(parent);
-            msgBox.setWindowTitle("Mise \u00e0 jour disponible");
-            msgBox.setText(QString("Une nouvelle version (%1) est disponible.\nVotre version actuelle est %2.")
+            msgBox.setWindowTitle(QString::fromUtf8("Mise \xC3\xA0 jour disponible"));
+            msgBox.setText(QString::fromUtf8("Une nouvelle version (%1) est disponible.\nVotre version actuelle est %2.")
                 .arg(QString::fromStdString(latestVersion))
                 .arg(QString::fromStdString(SERVER_VERSION)));
-            msgBox.setInformativeText("Voulez-vous mettre \u00e0 jour maintenant ?");
+            msgBox.setInformativeText(QString::fromUtf8("Voulez-vous mettre \xC3\xA0 jour maintenant ?"));
             msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
             msgBox.setDefaultButton(QMessageBox::Yes);
-            msgBox.setButtonText(QMessageBox::Yes, "Mettre \u00e0 jour");
+            msgBox.setButtonText(QMessageBox::Yes, QString::fromUtf8("Mettre \xC3\xA0 jour"));
             msgBox.setButtonText(QMessageBox::No, "Plus tard");
 
             int ret = msgBox.exec();
