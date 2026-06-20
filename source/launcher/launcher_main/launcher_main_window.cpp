@@ -239,6 +239,17 @@ progressBar(nullptr)
     settingsButton->setStyleSheet(sideBtn);
     sideLayout->addWidget(settingsButton);
 
+    // Bouton : ouvrir le dossier du jeu
+    QPushButton* folderButton = new QPushButton("  DOSSIER DU JEU", this);
+    folderButton->setStyleSheet(sideBtn);
+    sideLayout->addWidget(folderButton);
+    connect(folderButton, &QPushButton::clicked, this, [this]() {
+        // Ouvre le dossier parent (le dossier du jeu) dans l'explorateur
+        fs::path gameDir = fs::path(launcherDir).parent_path();
+        std::string path = gameDir.string();
+        ShellExecuteA(NULL, "open", path.c_str(), NULL, NULL, SW_SHOWNORMAL);
+    });
+
     sideLayout->addStretch();
 
     // ===== Statut serveur compact (sidebar) =====
@@ -280,6 +291,17 @@ progressBar(nullptr)
         QLabel* rankLabel = new QLabel(QString::fromUtf8("%1  RANG : %2").arg(icon).arg(rank), this);
         rankLabel->setStyleSheet("color: #ffd633; font-size: 11px; font-weight: bold; letter-spacing: 1px; padding: 2px 18px 6px 18px; background: transparent;");
         sideLayout->addWidget(rankLabel);
+    }
+
+    // ===== Compteur de lancements =====
+    {
+        long long count = 0;
+        fs::path lc = fs::path(launcherDir) / "launches.txt";
+        if (fs::exists(lc)) { std::ifstream in(lc); if (in) in >> count; }
+        QLabel* launchCountLabel = new QLabel(QString("LANCEMENTS : %1").arg(count), this);
+        launchCountLabel->setObjectName("launchCountLabel");
+        launchCountLabel->setStyleSheet("color: #8a8a82; font-size: 11px; font-weight: bold; letter-spacing: 1px; padding: 0 18px 6px 18px; background: transparent;");
+        sideLayout->addWidget(launchCountLabel);
     }
 
     QFrame* sep = new QFrame(this);
@@ -565,9 +587,42 @@ void MainWindow::addPlaytimeAndRefresh() {
 
 void MainWindow::startGame(bool isOnline, bool isVanilla) {
 
+    // ===== Détecteur : BlackOps4 déjà lancé ? =====
+    {
+        bool alreadyRunning = false;
+        HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (snap != INVALID_HANDLE_VALUE) {
+            PROCESSENTRY32 pe; pe.dwSize = sizeof(pe);
+            if (Process32First(snap, &pe)) {
+                do {
+                    if (_stricmp(pe.szExeFile, "BlackOps4.exe") == 0) { alreadyRunning = true; break; }
+                } while (Process32Next(snap, &pe));
+            }
+            CloseHandle(snap);
+        }
+        if (alreadyRunning) {
+            QMessageBox msgBox(QMessageBox::Warning, "Jeu deja lance",
+                QString::fromUtf8("Black Ops 4 est deja en cours d'execution.\nFerme le jeu avant d'en relancer un."),
+                QMessageBox::Ok, this);
+            msgBox.exec();
+            return;
+        }
+    }
+
     // Marque le début de session de jeu (pour le compteur de temps)
     gameStartTime = time(nullptr);
     gameRunning = true;
+
+    // ===== Compteur de lancements (+1) =====
+    {
+        fs::path lc = fs::path(launcherDir) / "launches.txt";
+        long long count = 0;
+        if (fs::exists(lc)) { std::ifstream in(lc); if (in) in >> count; }
+        count++;
+        { std::ofstream out(lc); out << count; }
+        QLabel* ll = this->findChild<QLabel*>("launchCountLabel");
+        if (ll) ll->setText(QString("LANCEMENTS : %1").arg(count));
+    }
 
     // ===== Écran de chargement cinématique =====
     {
@@ -866,8 +921,8 @@ void MainWindow::refreshServerInfo() {
             std::regex rLobbies("LOBBYS ACTIVE[\\s\\S]*?<h6[^>]*>\\s*(\\d+)");
             if (std::regex_search(html, m, rLobbies)) lobbies = m[1];
 
-            // Lobbies : Hosted by X ... <td>MAP[MP/ZM] ... <td>N</td> ... joinlobby&exInfo=ID
-            std::regex rLobby("Lobby_\\d+<sup>\\[Hosted by ([^\\]]+)\\][\\s\\S]*?<td>([^<]+)\\[(?:MP|ZM)\\]<sup>[\\s\\S]*?<td>(\\d+)</td>[\\s\\S]*?joinlobby&exInfo=(\\d+)");
+            // Lobbies : Hosted by X ... <td>MAP[MP/ZM] ... <td>N</td>
+            std::regex rLobby("Lobby_\\d+<sup>\\[Hosted by ([^\\]]+)\\][\\s\\S]*?<td>([^<]+)\\[(?:MP|ZM)\\]<sup>[\\s\\S]*?<td>(\\d+)</td>");
             auto begin = std::sregex_iterator(html.begin(), html.end(), rLobby);
             auto end = std::sregex_iterator();
             for (auto it = begin; it != end; ++it) {
@@ -907,7 +962,6 @@ void MainWindow::refreshServerInfo() {
                     if (item->widget()) item->widget()->deleteLater();
                     delete item;
                 }
-                // Construire les boutons lobby
                 if (lobbyData.isEmpty() || !isOnline) {
                     QLabel* lbl = new QLabel(isOnline ? "Aucun lobby actif." : "Serveur injoignable.", lobbyContainer);
                     lbl->setStyleSheet("color: #c8c6ba; font-size: 12px; background: transparent; border: none;");
@@ -916,31 +970,13 @@ void MainWindow::refreshServerInfo() {
                     QStringList rows = lobbyData.split("\n", Qt::SkipEmptyParts);
                     for (const QString& row : rows) {
                         QStringList parts = row.split("\t");
-                        if (parts.size() < 4) continue;
+                        if (parts.size() < 3) continue;
                         QString map = parts[0].trimmed();
                         QString host = parts[1].trimmed();
                         QString pl = parts[2].trimmed();
-                        QString id = parts[3].trimmed();
-
-                        QWidget* line = new QWidget(lobbyContainer);
-                        line->setStyleSheet("background: transparent;");
-                        QHBoxLayout* lh = new QHBoxLayout(line);
-                        lh->setContentsMargins(0,0,0,0);
-                        lh->setSpacing(8);
-                        QLabel* info = new QLabel(QString("%1  \xC2\xB7  %2 j  (%3)").arg(map).arg(pl).arg(host), line);
+                        QLabel* info = new QLabel(QString("\xE2\x96\xB8  %1  \xC2\xB7  %2 joueurs  (%3)").arg(map).arg(pl).arg(host), lobbyContainer);
                         info->setStyleSheet("color: #f5f3ea; font-size: 12px; font-weight: bold; background: transparent; border: none;");
-                        lh->addWidget(info, 1);
-                        QPushButton* joinBtn = new QPushButton("REJOINDRE", line);
-                        joinBtn->setStyleSheet(
-                            "QPushButton { background: #f2c411; color: #08080a; border: none; border-radius: 4px;"
-                            " padding: 5px 12px; font-size: 11px; font-weight: bold; letter-spacing: 1px; }"
-                            "QPushButton:hover { background: #ffd633; }");
-                        QString joinUrl = "http://70.55.126.7:8080/?action=joinlobby&exInfo=" + id;
-                        QObject::connect(joinBtn, &QPushButton::clicked, this, [joinUrl]() {
-                            QDesktopServices::openUrl(QUrl(joinUrl));
-                        });
-                        lh->addWidget(joinBtn);
-                        lobbyLayout->addWidget(line);
+                        lobbyLayout->addWidget(info);
                     }
                 }
             }
