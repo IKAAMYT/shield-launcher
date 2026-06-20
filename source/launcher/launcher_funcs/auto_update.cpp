@@ -13,7 +13,7 @@
 #include <filesystem>
 
 namespace updater {
-    const std::string SERVER_VERSION = "2.0.4";
+    const std::string SERVER_VERSION = "3.0.0";
 
     const std::string GITHUB_API_URL = "https://api.github.com/repos/IKAAMYT/shield-launcher/releases/latest";
     const std::string DOWNLOAD_URL_BASE = "https://github.com/IKAAMYT/shield-launcher/releases/download/";
