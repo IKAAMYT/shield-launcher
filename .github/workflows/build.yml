@@ -5,6 +5,9 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-2022
@@ -66,3 +69,12 @@ jobs:
         with:
           name: AlterBO4-Launcher
           path: artifact/
+
+      - name: Deposer les exe dans une release brouillon (usage interne)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "build-${{ github.run_number }}"
+          $exes = Get-ChildItem artifact -Filter *.exe | ForEach-Object { $_.FullName }
+          gh release create $tag --draft --title "Build automatique #${{ github.run_number }}" --notes "Exe compiles par GitHub Actions (commit ${{ github.sha }}). Brouillon : non visible par l'updater." $exes
