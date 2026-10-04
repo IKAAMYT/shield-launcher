@@ -37,4 +37,15 @@ polices embarquées, icônes, updater sur IKAAMYT/shield-launcher, project-bo4.j
 2. Recompiler le launcher (push sur GitHub -> Actions) puis remplacer Shield_Launcher.exe.
 3. project-bo4/Latest-Release-Files/project-bo4/internals/T8ShieldSupport/ n'existe plus chez
    upstream. Gardé ici par prudence ; à supprimer si le nouveau client ne s'en sert plus.
-4. Si tu publies une release, pense à bumper SERVER_VERSION dans auto_update.cpp.
+4. FAIT : version passée à 3.1.0 (auto_update.cpp), launcher recompilé (build #72),
+   release BROUILLON "3.1.0" créée sur GitHub avec AlterBO4_Update_3.1.0.zip.
+   → Pour la diffuser aux joueurs : GitHub > Releases > "AlterBO4 Launcher 3.1.0" > Edit > Publish release.
+
+## COMMENT PUBLIER UNE PROCHAINE VERSION (ex : 3.2.0)
+1. Dans source/launcher/launcher_funcs/auto_update.cpp, mets SERVER_VERSION = "3.2.0".
+2. Pousse sur GitHub : le build tourne tout seul et dépose Shield_Launcher.exe dans une
+   release brouillon "build-N" (Releases > Drafts). Télécharge-le et mets-le dans
+   project-bo4/Latest-Release-Files/project-bo4/launcher/, puis pousse à nouveau.
+3. Onglet Actions > "Publier une release AlterBO4" > Run workflow > version = 3.2.0.
+   Le workflow assemble AlterBO4_Update_3.2.0.zip (exe.zip pris chez upstream) et crée la
+   release brouillon. Vérifie, puis "Publish release" : l'updater des joueurs la propose.
