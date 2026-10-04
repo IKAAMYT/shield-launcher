@@ -776,13 +776,12 @@ void MainWindow::startGame(bool isOnline, bool isVanilla) {
 
     if (!isVanilla)
     {
-        auto result = DllLoading::extractDlls(currentDir, isOnline, reshadeEnabled);
-        if(result != DllLoading::Result::Success) {
+        // Upstream update : gestion d'erreur commune + extraction de exe.zip (BlackOps4.exe)
+        auto handleExtractionError = [&](DllLoading::Result result, const QString& missingFileMsg) {
             QString errorMsg;
             switch(result) {
             case DllLoading::Result::FileNotFound:
-                errorMsg = QString("Required files not found! Make sure %1 exists in the launcher directory.")
-                    .arg(isOnline ? "mp.zip" : "solo.zip");
+                errorMsg = missingFileMsg;
                 break;
             case DllLoading::Result::InvalidGamePath:
                 errorMsg = "BlackOps4.exe not found! Make sure the launcher shortcut is in the game directory.";
@@ -793,12 +792,26 @@ void MainWindow::startGame(bool isOnline, bool isVanilla) {
             default:
                 errorMsg = "Unknown error occurred while extracting files.";
             }
+            // Retirer l'écran de chargement avant d'afficher l'erreur
+            if (QWidget* ls = this->findChild<QWidget*>("loadingScreen")) ls->deleteLater();
             showMessageBox(QMessageBox::Critical, "Error", errorMsg);
             progressBar->setVisible(false);
 
             vanillaButton->setEnabled(true);
             onlineButton->setEnabled(true);
             offlineButton->setEnabled(true);
+        };
+
+        auto dllResult = DllLoading::extractDlls(currentDir, isOnline, reshadeEnabled);
+        if(dllResult != DllLoading::Result::Success) {
+            handleExtractionError(dllResult, QString("Required files not found! Make sure %1 exists in the launcher directory.")
+                .arg(isOnline ? "mp.zip" : "solo.zip"));
+            return;
+        }
+
+        auto exeResult = DllLoading::extractExe(currentDir);
+        if(exeResult != DllLoading::Result::Success) {
+            handleExtractionError(exeResult, "Required files not found! Make sure exe.zip exists in the launcher directory.");
             return;
         }
     }
@@ -829,6 +842,7 @@ void MainWindow::startGame(bool isOnline, bool isVanilla) {
         gameExePath = currentPath.parent_path().parent_path() / game_exe;
     }
     else {
+        if (QWidget* ls = this->findChild<QWidget*>("loadingScreen")) ls->deleteLater();
         showMessageBox(QMessageBox::Critical, "Error", "Could not locate BlackOps4.exe!");
         progressBar->setVisible(false);
 
@@ -839,6 +853,7 @@ void MainWindow::startGame(bool isOnline, bool isVanilla) {
     }
 
     if (!DllLoading::launchGame(gameExePath.string(), isOnline)) {
+        if (QWidget* ls = this->findChild<QWidget*>("loadingScreen")) ls->deleteLater();
         showMessageBox(QMessageBox::Critical, "Error", "Failed to start the game!");
         progressBar->setVisible(false);
 
