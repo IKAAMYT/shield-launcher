@@ -29,7 +29,7 @@ namespace JsonUtils {
         GetUserNameA(username, &size);
 
         rapidjson::Value demonware(rapidjson::kObjectType);
-        demonware.AddMember("ipv4", "78.157.42.107", allocator);  
+        demonware.AddMember("ipv4", "70.55.125.113", allocator);  
         doc.AddMember("demonware", demonware, allocator);
 
         rapidjson::Value identity(rapidjson::kObjectType);

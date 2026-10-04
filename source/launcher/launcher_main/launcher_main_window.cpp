@@ -28,6 +28,13 @@
 #include <QAbstractAnimation>
 #include <QFontDatabase>
 #include <QFont>
+
+// ===== Serveur AlterBO4 =====
+// Pour changer de serveur : modifier ces deux lignes, recompiler, publier une release.
+static const char* ALTERBO4_SERVER_HOST = "server.riseclan.ca";
+static const char* ALTERBO4_SERVER_IP   = "70.55.125.113";
+// Anciennes IP : si la config d'un joueur pointe encore dessus, on la migre automatiquement.
+static const char* ALTERBO4_OLD_IPS[]   = { "70.55.126.7", "78.157.42.107" };
 #include <QApplication>
 #include <QGraphicsOpacityEffect>
 #include <QPropertyAnimation>
@@ -424,7 +431,7 @@ progressBar(nullptr)
     contentLayout->addWidget(srvLabel);
 
     serverCombo = new QComboBox(this);
-    serverCombo->addItem("Serveur Principal  -  70.55.126.7", "70.55.126.7");
+    serverCombo->addItem(QString("Serveur Principal  -  ") + ALTERBO4_SERVER_HOST, ALTERBO4_SERVER_IP);
     // Ajoute d'autres serveurs ici : serverCombo->addItem("Nom  -  IP", "IP");
     serverCombo->setStyleSheet(
         "QComboBox { background: rgba(10,10,8,200); color: #f5f3ea; border: 1px solid #f2c411;"
@@ -438,6 +445,14 @@ progressBar(nullptr)
         QString ip = serverCombo->currentData().toString();
         if (!ip.isEmpty()) saveServerIp(ip.toStdString());
     });
+    // Migration automatique : config vide ou sur une ancienne IP -> nouvelle IP du serveur
+    {
+        std::string cfgPath = (fs::path(QCoreApplication::applicationDirPath().toStdString()) / "project-bo4.json").string();
+        std::string curIp = JsonUtils::getJsonItem(cfgPath, "demonware", "ipv4");
+        bool migrate = curIp.empty();
+        for (const char* oldIp : ALTERBO4_OLD_IPS) if (curIp == oldIp) migrate = true;
+        if (migrate) saveServerIp(ALTERBO4_SERVER_IP);
+    }
 
     contentLayout->addSpacing(14);
 
@@ -1127,7 +1142,11 @@ void MainWindow::refreshServerInfo() {
                     // mode non-bloquant pour timeout
                     u_long mode = 1; ioctlsocket(sock, FIONBIO, &mode);
                     sockaddr_in addr; addr.sin_family = AF_INET; addr.sin_port = htons(8080);
-                    addr.sin_addr.s_addr = inet_addr("70.55.126.7");
+                    addr.sin_addr.s_addr = inet_addr(ALTERBO4_SERVER_IP);
+                    if (hostent* he = gethostbyname(ALTERBO4_SERVER_HOST)) {
+                        if (he->h_addr_list && he->h_addr_list[0])
+                            memcpy(&addr.sin_addr, he->h_addr_list[0], sizeof(addr.sin_addr));
+                    }
                     auto t0 = std::chrono::steady_clock::now();
                     ::connect(sock, (sockaddr*)&addr, sizeof(addr));
                     fd_set wset; FD_ZERO(&wset); FD_SET(sock, &wset);
@@ -1145,7 +1164,8 @@ void MainWindow::refreshServerInfo() {
         std::string html;
         HINTERNET hNet = InternetOpenA("AlterBO4-Launcher", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
         if (hNet) {
-            HINTERNET hUrl = InternetOpenUrlA(hNet, "http://70.55.126.7:8080/",
+            std::string statusUrl = std::string("http://") + ALTERBO4_SERVER_HOST + ":8080/";
+            HINTERNET hUrl = InternetOpenUrlA(hNet, statusUrl.c_str(),
                 NULL, 0, INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE, 0);
             if (hUrl) {
                 char buf[4096]; DWORD read = 0;

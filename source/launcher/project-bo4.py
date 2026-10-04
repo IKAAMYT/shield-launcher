@@ -106,7 +106,7 @@ def get_json_item(json_path, spot, name):
             data = {
                 "demonware":
                 {
-                    "ipv4": "78.157.42.107" #bods server
+                    "ipv4": "70.55.125.113" #serveur AlterBO4 (server.riseclan.ca)
                 },
                 "identity":
                 {
