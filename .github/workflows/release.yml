@@ -84,9 +84,12 @@ jobs:
         shell: pwsh
         run: |
           $v = "${{ github.event.inputs.version }}"
-          # si un brouillon avec ce tag existe deja, on le remplace
-          $existing = gh api "repos/${{ github.repository }}/releases" --jq ".[] | select(.tag_name==\"$v\" and .draft==true) | .id"
-          foreach ($id in $existing) { if ($id) { Write-Host "Suppression de l'ancien brouillon $v (id $id)"; gh api -X DELETE "repos/${{ github.repository }}/releases/$id" } }
+          # si des brouillons avec ce tag existent deja, on les remplace
+          $jq = '.[] | select(.draft==true and .tag_name=="' + $v + '") | .id'
+          $existing = @(gh api "repos/${{ github.repository }}/releases?per_page=100" --jq $jq)
+          foreach ($id in $existing) {
+            if ($id) { Write-Host "Suppression de l'ancien brouillon $v (id $id)"; gh api -X DELETE "repos/${{ github.repository }}/releases/$id" }
+          }
           $flags = @("--target", "main", "--title", "AlterBO4 Launcher $v")
           if ("${{ github.event.inputs.publish }}" -ne "true") { $flags += "--draft" }
           $notes = "Mise a jour AlterBO4 $v`n`nLe launcher propose la mise a jour automatiquement au lancement. Installation manuelle : extraire le zip dans le dossier Call of Duty Black Ops 4 (fusionner project-bo4)."
