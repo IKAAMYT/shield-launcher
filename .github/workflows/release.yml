@@ -1,0 +1,87 @@
+name: Publier une release AlterBO4
+
+# Lancement manuel : onglet Actions > "Publier une release AlterBO4" > Run workflow
+# Assemble AlterBO4_Update_<version>.zip a partir de project-bo4/Latest-Release-Files
+# (+ exe.zip recupere depuis la release upstream) et cree une release BROUILLON.
+# Il suffit ensuite de cliquer "Publish release" sur GitHub pour que l'updater
+# des joueurs la propose.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Numero de version (ex: 3.1.0) - doit etre > a la version actuelle"
+        required: true
+      publish:
+        description: "Publier directement (true) ou laisser en brouillon (false)"
+        required: true
+        default: "false"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-2022
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verifier la version compilee dans le launcher
+        shell: pwsh
+        run: |
+          $v = "${{ github.event.inputs.version }}"
+          $src = Get-Content source/launcher/launcher_funcs/auto_update.cpp -Raw
+          if ($src -notmatch "SERVER_VERSION = `"$([regex]::Escape($v))`"") {
+            Write-Error "auto_update.cpp ne contient pas SERVER_VERSION = `"$v`". Mets a jour la version dans le code et recompile d'abord."
+            exit 1
+          }
+          Write-Host "SERVER_VERSION = $v : OK"
+
+      - name: Recuperer exe.zip depuis la release upstream
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path upstream | Out-Null
+          gh release download -R NotNierPea/shield-launcher --pattern "*" -D upstream
+          Get-ChildItem upstream | ForEach-Object { Write-Host "Asset upstream: $($_.Name) ($([math]::Round($_.Length/1MB,1)) Mo)" }
+          # extraire toutes les archives (zip/rar/7z) et chercher exe.zip
+          Get-ChildItem upstream -Include *.zip,*.rar,*.7z -Recurse | ForEach-Object {
+            if ($_.Name -ne "exe.zip" -and $_.Name -ne "mp.zip" -and $_.Name -ne "solo.zip") {
+              Write-Host "Extraction de $($_.Name)"
+              & 7z x -y -o"upstream\extracted\$($_.BaseName)" $_.FullName | Out-Null
+            }
+          }
+          $exe = Get-ChildItem upstream -Recurse -Filter exe.zip | Select-Object -First 1
+          if (-not $exe) { Write-Error "exe.zip introuvable dans la release upstream"; exit 1 }
+          Write-Host "exe.zip trouve : $($exe.FullName) ($([math]::Round($exe.Length/1MB,1)) Mo)"
+          New-Item -ItemType Directory -Force -Path stage/project-bo4/launcher | Out-Null
+          Copy-Item $exe.FullName stage/project-bo4/launcher/exe.zip
+
+      - name: Assembler le zip de mise a jour
+        shell: pwsh
+        run: |
+          $v = "${{ github.event.inputs.version }}"
+          $R = "project-bo4/Latest-Release-Files/project-bo4"
+          New-Item -ItemType Directory -Force -Path stage/project-bo4/launcher, stage/project-bo4/plugins, stage/project-bo4/zone, stage/project-bo4/zone_mods | Out-Null
+          Copy-Item "$R/launcher/Shield_Launcher.exe", "$R/launcher/mp.zip", "$R/launcher/solo.zip" stage/project-bo4/launcher/
+          Copy-Item "$R/plugins/acts-shield-plugin.dll" stage/project-bo4/plugins/
+          Copy-Item "$R/zone/support.ff" stage/project-bo4/zone/
+          Copy-Item "$R/zone_mods/T8ShieldSupport_FF" stage/project-bo4/zone_mods/ -Recurse
+          Copy-Item "$R/internals" stage/project-bo4/ -Recurse
+          # (project-bo4.json et launcher-config.json volontairement exclus : reglages des joueurs)
+          Push-Location stage
+          & 7z a -tzip -mx=5 "..\AlterBO4_Update_$v.zip" project-bo4 | Out-Null
+          Pop-Location
+          Get-Item "AlterBO4_Update_$v.zip" | ForEach-Object { Write-Host "Zip pret : $($_.Name) ($([math]::Round($_.Length/1MB,1)) Mo)" }
+
+      - name: Creer la release
+        shell: pwsh
+        run: |
+          $v = "${{ github.event.inputs.version }}"
+          $flags = @("--target", "main", "--title", "AlterBO4 Launcher $v")
+          if ("${{ github.event.inputs.publish }}" -ne "true") { $flags += "--draft" }
+          $notes = "Mise a jour AlterBO4 $v`n`nLe launcher propose la mise a jour automatiquement au lancement. Installation manuelle : extraire le zip dans le dossier Call of Duty Black Ops 4 (fusionner project-bo4)."
+          gh release create $v @flags --notes $notes "AlterBO4_Update_$v.zip"
+          Write-Host "Release $v creee (brouillon = ${{ github.event.inputs.publish }} != true)"
