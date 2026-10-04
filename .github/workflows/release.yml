@@ -66,6 +66,10 @@ jobs:
           $R = "project-bo4/Latest-Release-Files/project-bo4"
           New-Item -ItemType Directory -Force -Path stage/project-bo4/launcher, stage/project-bo4/plugins, stage/project-bo4/zone, stage/project-bo4/zone_mods | Out-Null
           Copy-Item "$R/launcher/Shield_Launcher.exe", "$R/launcher/mp.zip", "$R/launcher/solo.zip" stage/project-bo4/launcher/
+          # DLL Qt + plugin platforms : le launcher ne demarre pas sans, on les inclut par securite
+          Copy-Item "$R/launcher/Qt6Core.dll", "$R/launcher/Qt6Gui.dll", "$R/launcher/Qt6Widgets.dll", "$R/launcher/Qt6Network.dll" stage/project-bo4/launcher/
+          New-Item -ItemType Directory -Force -Path stage/project-bo4/launcher/platforms | Out-Null
+          Copy-Item "$R/launcher/platforms/qwindows.dll" stage/project-bo4/launcher/platforms/
           Copy-Item "$R/plugins/acts-shield-plugin.dll" stage/project-bo4/plugins/
           Copy-Item "$R/zone/support.ff" stage/project-bo4/zone/
           Copy-Item "$R/zone_mods/T8ShieldSupport_FF" stage/project-bo4/zone_mods/ -Recurse
@@ -80,6 +84,9 @@ jobs:
         shell: pwsh
         run: |
           $v = "${{ github.event.inputs.version }}"
+          # si un brouillon avec ce tag existe deja, on le remplace
+          $existing = gh api "repos/${{ github.repository }}/releases" --jq ".[] | select(.tag_name==\"$v\" and .draft==true) | .id"
+          foreach ($id in $existing) { if ($id) { Write-Host "Suppression de l'ancien brouillon $v (id $id)"; gh api -X DELETE "repos/${{ github.repository }}/releases/$id" } }
           $flags = @("--target", "main", "--title", "AlterBO4 Launcher $v")
           if ("${{ github.event.inputs.publish }}" -ne "true") { $flags += "--draft" }
           $notes = "Mise a jour AlterBO4 $v`n`nLe launcher propose la mise a jour automatiquement au lancement. Installation manuelle : extraire le zip dans le dossier Call of Duty Black Ops 4 (fusionner project-bo4)."
